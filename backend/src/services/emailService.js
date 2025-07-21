@@ -10,6 +10,11 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendResetEmail(to, resetLink) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    // Fallback for development: log the reset link
+    console.log(`[DEV] Password reset link for ${to}: ${resetLink}`);
+    return Promise.resolve();
+  }
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to,
@@ -19,7 +24,17 @@ async function sendResetEmail(to, resetLink) {
            <a href="${resetLink}">${resetLink}</a>
            <p>If you did not request this, please ignore this email.</p>`
   };
-  return transporter.sendMail(mailOptions);
+  try {
+    return await transporter.sendMail(mailOptions);
+  } catch (err) {
+    console.error('Failed to send reset email:', err);
+    // In development, do not throw, just log
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[DEV] (Email not sent) Password reset link for ${to}: ${resetLink}`);
+      return Promise.resolve();
+    }
+    throw err;
+  }
 }
 
 module.exports = { sendResetEmail };
