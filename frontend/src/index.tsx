@@ -19,19 +19,22 @@ import "bootstrap/dist/js/bootstrap.bundle.min";
 
 // ✅ Import AuthProvider
 import { AuthProvider } from "./contexts/AuthContext";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
 );
 
 root.render(
-  <React.StrictMode>
-    <Provider store={store}>
-      <AuthProvider>
-        <BrowserRouter basename={base_path}>
-          <ALLRoutes />
-        </BrowserRouter>
-      </AuthProvider>
-    </Provider>
-  </React.StrictMode>
+  <GoogleOAuthProvider clientId="423139872647-vlv0qu5piru7585a4b7mgrfgkcit3caq.apps.googleusercontent.com">
+    <React.StrictMode>
+      <Provider store={store}>
+        <AuthProvider>
+          <BrowserRouter basename={base_path}>
+            <ALLRoutes />
+          </BrowserRouter>
+        </AuthProvider>
+      </Provider>
+    </React.StrictMode>
+  </GoogleOAuthProvider>
 );

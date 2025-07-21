@@ -227,7 +227,8 @@ const Profile = () => {
     try {
       const response = await userAPI.changePassword({
         currentPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword
+        newPassword: passwordData.newPassword,
+        confirmPassword: passwordData.confirmPassword
       });
       if (response.data.success) {
         setSuccess('Password changed successfully!');

@@ -673,105 +673,23 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 });
 
 // READ ONE User - Protected
-app.get('/api/users/:id', authenticateToken, async (req, res) => {
+app.get('/api/user/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     logInfo('Récupération d\'un utilisateur', { userId: id, requestedBy: req.user.username });
-    
     const user = await User.findById(id).select('-password');
-    
     if (!user) {
       logWarning('Utilisateur non trouvé', { userId: id, requestedBy: req.user.username });
       return sendErrorResponse(res, 404, 'Utilisateur non trouvé', 'USER_NOT_FOUND');
     }
-    
     logSuccess('Utilisateur trouvé', { userId: id, username: user.username });
     sendSuccessResponse(res, 200, 'Utilisateur trouvé', { user });
-    
   } catch (err) {
     logError('Erreur lors de la récupération de l\'utilisateur', err, req);
-    
     if (err.name === 'CastError') {
       return sendErrorResponse(res, 400, 'ID utilisateur invalide', 'INVALID_USER_ID');
     }
-    
     sendErrorResponse(res, 500, 'Erreur lors de la récupération de l\'utilisateur', 'FETCH_USER_ERROR', { error: err.message });
-  }
-});
-
-// CREATE User - Protected
-app.post('/api/users', authenticateToken, async (req, res) => {
-  try {
-    const { username, email, password, firstName, lastName, role } = req.body;
-    
-    logInfo('Création d\'un nouvel utilisateur', { 
-      username, 
-      email, 
-      role, 
-      createdBy: req.user.username 
-    });
-    
-    if (!username || !email || !password || !firstName) {
-      logWarning('Création utilisateur échouée - champs manquants', { 
-        received: { username: !!username, email: !!email, password: !!password, firstName: !!firstName },
-        createdBy: req.user.username
-      });
-      return sendErrorResponse(res, 400, 'Les champs username, email, password et firstName sont requis', 'MISSING_FIELDS');
-    }
-
-    if (role && !Object.values(UserRole).includes(role)) {
-      logWarning('Création utilisateur échouée - rôle invalide', { role, createdBy: req.user.username });
-      return sendErrorResponse(res, 400, `Le rôle doit être l'un des suivants: ${Object.values(UserRole).join(', ')}`, 'INVALID_ROLE');
-    }
-
-    const newUser = new User({
-      username,
-      email,
-      password,
-      firstName,
-      lastName,
-      role: role || UserRole.STARTUP
-    });
-
-    await newUser.save();
-    
-    logSuccess('Utilisateur créé avec succès', { 
-      userId: newUser._id, 
-      username, 
-      email, 
-      createdBy: req.user.username 
-    });
-    
-    const userData = {
-      id: newUser._id,
-      username: newUser.username,
-      email: newUser.email,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
-      role: newUser.role,
-      isActive: newUser.isActive,
-      createdAt: newUser.createdAt
-    };
-
-    sendSuccessResponse(res, 201, 'Utilisateur créé avec succès', { user: userData });
-    
-  } catch (err) {
-    logError('Erreur lors de la création de l\'utilisateur', err, req);
-    
-    if (err.name === 'ValidationError') {
-      const errors = Object.keys(err.errors).map(key => ({
-        field: key,
-        message: err.errors[key].message
-      }));
-      return sendErrorResponse(res, 400, 'Erreur de validation', 'VALIDATION_ERROR', { errors });
-    }
-    
-    if (err.code === 11000) {
-      const field = Object.keys(err.keyPattern)[0];
-      return sendErrorResponse(res, 409, `Ce ${field} est déjà utilisé`, 'DUPLICATE_FIELD');
-    }
-    
-    sendErrorResponse(res, 500, 'Erreur lors de la création de l\'utilisateur', 'CREATE_USER_ERROR', { error: err.message });
   }
 });
 
