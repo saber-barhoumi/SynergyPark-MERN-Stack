@@ -20,6 +20,14 @@ const userSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   profilePhoto: { type: String, default: '' },
   
+  // ✅ Additional Profile Fields
+  phone: { type: String, default: '' },
+  address: { type: String, default: '' },
+  country: { type: String, default: '' },
+  state: { type: String, default: '' },
+  city: { type: String, default: '' },
+  postalCode: { type: String, default: '' },
+  
   // ✅ Password Reset Fields
   resetPasswordToken: { type: String, default: null },
   resetPasswordExpires: { type: Date, default: null },

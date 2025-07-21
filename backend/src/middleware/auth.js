@@ -31,7 +31,14 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    req.user = user;
+    // Set req.user with the user object and explicitly include userId
+    req.user = {
+      userId: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive
+    };
     next();
   } catch (err) {
     return res.status(403).json({

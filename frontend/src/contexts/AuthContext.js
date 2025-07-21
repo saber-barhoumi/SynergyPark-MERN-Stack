@@ -99,6 +99,15 @@ export const AuthProvider = ({ children }) => {
     console.log('[AuthContext] signout: token removed, set unauthenticated');
   };
 
+  // Add updateUser function to update user data in context
+  const updateUser = (userData) => {
+    setUser(prevUser => ({
+      ...prevUser,
+      ...userData
+    }));
+    console.log('[AuthContext] updateUser: user data updated', userData);
+  };
+
   const value = {
     user,
     isAuthenticated,
@@ -106,6 +115,7 @@ export const AuthProvider = ({ children }) => {
     signin,
     signup,
     signout,
+    updateUser,
   };
 
   return (

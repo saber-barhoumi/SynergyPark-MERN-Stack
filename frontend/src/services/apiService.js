@@ -181,6 +181,28 @@ export const userAPI = {
       throw error;
     }
   },
+  
+  updateProfileWithPhoto: async (formData) => {
+    try {
+      // Get the token from localStorage
+      const token = localStorage.getItem('token');
+      
+      // Create a custom config to handle multipart/form-data while preserving Authorization header
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          // Ensure Authorization header is included
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      };
+      
+      const response = await apiClient.put('/api/user/profile', formData, config);
+      return response;
+    } catch (error) {
+      console.error('Update profile with photo API error:', error);
+      throw error;
+    }
+  },
 
   changePassword: async (passwordData) => {
     try {

@@ -32,7 +32,7 @@ interface PasswordFormData {
 
 const Profile = () => {
   const route = all_routes;
-  const { user, signout } = useAuth();
+  const { user, signout, updateUser } = useAuth();
   const navigate = useNavigate();
   
   const [profileData, setProfileData] = useState<ProfileFormData>({
@@ -46,6 +46,9 @@ const Profile = () => {
     city: '',
     postalCode: ''
   });
+  
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string>('');
 
   const [passwordData, setPasswordData] = useState<PasswordFormData>({
     currentPassword: '',
@@ -127,6 +130,25 @@ const Profile = () => {
     setProfileError('');
     setProfileSuccess('');
   };
+  
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setProfilePhoto(file);
+      
+      // Create a preview URL
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target && event.target.result) {
+          setPhotoPreview(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+      
+      setProfileError('');
+      setProfileSuccess('');
+    }
+  };
 
   const handlePasswordInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -145,9 +167,27 @@ const Profile = () => {
     setProfileSuccess('');
 
     try {
-      const response = await userAPI.updateProfile(profileData);
+      // Create FormData to handle file upload
+      const formData = new FormData();
+      
+      // Add all profile data fields
+      Object.entries(profileData).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+      
+      // Add profile photo if selected
+      if (profilePhoto) {
+        formData.append('profilePhoto', profilePhoto);
+      }
+      
+      const response = await userAPI.updateProfileWithPhoto(formData);
       if (response.data.success) {
         setProfileSuccess('Profile updated successfully!');
+        
+        // Update auth context with the updated user data
+        if (response.data.data) {
+          updateUser(response.data.data);
+        }
       } else {
         setProfileError(response.data.message || 'Failed to update profile');
       }
@@ -305,7 +345,21 @@ const Profile = () => {
                         <h6 className="mb-3">Basic Information</h6>
                         <div className="d-flex align-items-center flex-wrap row-gap-3 bg-light w-100 rounded p-3 mb-4">
                           <div className="d-flex align-items-center justify-content-center avatar avatar-xxl rounded-circle border border-dashed me-2 flex-shrink-0 text-dark frames">
-                            <i className="ti ti-photo text-gray-3 fs-16" />
+                            {photoPreview ? (
+                              <img 
+                                src={photoPreview} 
+                                alt="Profile Preview" 
+                                className="rounded-circle w-100 h-100 object-fit-cover" 
+                              />
+                            ) : user?.profilePhoto ? (
+                              <img 
+                                src={user.profilePhoto} 
+                                alt="Current Profile" 
+                                className="rounded-circle w-100 h-100 object-fit-cover" 
+                              />
+                            ) : (
+                              <i className="ti ti-photo text-gray-3 fs-16" />
+                            )}
                           </div>
                           <div className="profile-upload">
                             <div className="mb-2">
@@ -320,7 +374,8 @@ const Profile = () => {
                                 <input
                                   type="file"
                                   className="form-control image-sign"
-                                  multiple
+                                  accept="image/*"
+                                  onChange={handlePhotoUpload}
                                 />
                               </div>
                               <Link
@@ -431,6 +486,14 @@ const Profile = () => {
                             className="select"
                             options={countryChoose}
                             defaultValue={countryChoose.find(c => c.value === profileData.country) || countryChoose[0]}
+                            onChange={(selectedOption: any) => {
+                              setProfileData(prevState => ({
+                                ...prevState,
+                                country: selectedOption.value
+                              }));
+                              setProfileError('');
+                              setProfileSuccess('');
+                            }}
                           />
                         </div>
                       </div>
@@ -446,6 +509,14 @@ const Profile = () => {
                               className="select"
                               options={stateChoose}
                               defaultValue={stateChoose.find(s => s.value === profileData.state) || stateChoose[0]}
+                              onChange={(selectedOption: any) => {
+                                setProfileData(prevState => ({
+                                  ...prevState,
+                                  state: selectedOption.value
+                                }));
+                                setProfileError('');
+                                setProfileSuccess('');
+                              }}
                             />
                           </div>
                         </div>
@@ -462,6 +533,14 @@ const Profile = () => {
                               className="select"
                               options={cityChoose}
                               defaultValue={cityChoose.find(c => c.value === profileData.city) || cityChoose[0]}
+                              onChange={(selectedOption: any) => {
+                                setProfileData(prevState => ({
+                                  ...prevState,
+                                  city: selectedOption.value
+                                }));
+                                setProfileError('');
+                                setProfileSuccess('');
+                              }}
                             />
                           </div>
                         </div>

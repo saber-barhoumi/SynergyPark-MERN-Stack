@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const path = require('path');
+const fileUpload = require('express-fileupload');
 // ✅ Import du modèle User
 const { User, UserRole } = require('./models/User');
 
@@ -54,7 +56,21 @@ app.use(cors({
 
 
 app.use(express.json({ limit: '10mb' }));
+
+// Configure file upload middleware
+app.use(fileUpload({
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max file size
+  abortOnLimit: true,
+  useTempFiles: true,
+  tempFileDir: '/tmp/'
+}));
+
+// Set up static file serving for uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// API Routes
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/user', require('./routes/userRoutes'));
 
 // 📝 Request Logging Middleware
 app.use((req, res, next) => {
