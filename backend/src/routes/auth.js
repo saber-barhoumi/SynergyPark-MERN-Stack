@@ -3,10 +3,16 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const svgCaptcha = require('svg-captcha');
 const { User, UserRole } = require('../models/User');
+const { sendResetEmail } = require('../services/emailService');
 
 // JWT Secret (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+
+// Store for reset tokens (in production, use Redis or database)
+const resetTokens = new Map();
 
 // ✅ SIGNUP Route
 router.post('/signup', async (req, res) => {
@@ -77,17 +83,20 @@ router.post('/signup', async (req, res) => {
     );
 
     res.status(201).json({
+      success: true,
       message: 'Utilisateur créé avec succès',
-      token,
-      user: {
-        id: newUser._id,
-        username: newUser.username,
-        email: newUser.email,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        role: newUser.role,
-        isActive: newUser.isActive,
-        createdAt: newUser.createdAt
+      data: {
+        token,
+        user: {
+          id: newUser._id,
+          username: newUser.username,
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          role: newUser.role,
+          isActive: newUser.isActive,
+          createdAt: newUser.createdAt
+        }
       }
     });
 
@@ -96,6 +105,7 @@ router.post('/signup', async (req, res) => {
     
     if (err.name === 'ValidationError') {
       return res.status(400).json({
+        success: false,
         message: 'Erreur de validation',
         errors: Object.keys(err.errors).map(key => ({
           field: key,
@@ -107,11 +117,13 @@ router.post('/signup', async (req, res) => {
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
       return res.status(409).json({
+        success: false,
         message: `Ce ${field} est déjà utilisé`
       });
     }
     
     res.status(500).json({
+      success: false,
       message: 'Erreur lors de l\'inscription',
       error: err.message
     });
@@ -121,12 +133,26 @@ router.post('/signup', async (req, res) => {
 // ✅ SIGNIN Route
 router.post('/signin', async (req, res) => {
   try {
-    const { login, password } = req.body; // login peut être email ou username
+    const { login, password, captcha, captchaId } = req.body; // login peut être email ou username
     
     if (!login || !password) {
       return res.status(400).json({
+        success: false,
         message: 'Email/nom d\'utilisateur et mot de passe sont requis'
       });
+    }
+
+    // CAPTCHA validation (if enabled)
+    if (captcha && captchaId) {
+      const storedCaptcha = captchaStore.get(captchaId);
+      if (!storedCaptcha || storedCaptcha.text.toLowerCase() !== captcha.toLowerCase()) {
+        return res.status(400).json({
+          success: false,
+          message: 'CAPTCHA invalide'
+        });
+      }
+      // Remove used CAPTCHA
+      captchaStore.delete(captchaId);
     }
 
     // Chercher l'utilisateur par email ou username
@@ -136,6 +162,7 @@ router.post('/signin', async (req, res) => {
 
     if (!user) {
       return res.status(401).json({
+        success: false,
         message: 'Identifiants invalides'
       });
     }
@@ -143,6 +170,7 @@ router.post('/signin', async (req, res) => {
     // Vérifier si l'utilisateur est actif
     if (!user.isActive) {
       return res.status(401).json({
+        success: false,
         message: 'Compte désactivé'
       });
     }
@@ -152,6 +180,7 @@ router.post('/signin', async (req, res) => {
     
     if (!isPasswordValid) {
       return res.status(401).json({
+        success: false,
         message: 'Identifiants invalides'
       });
     }
@@ -171,24 +200,28 @@ router.post('/signin', async (req, res) => {
     );
 
     res.json({
+      success: true,
       message: 'Connexion réussie',
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        isActive: user.isActive,
-        profilePhoto: user.profilePhoto,
-        lastLogin: new Date()
+      data: {
+        token,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          isActive: user.isActive,
+          profilePhoto: user.profilePhoto,
+          lastLogin: new Date()
+        }
       }
     });
 
   } catch (err) {
     console.error('❌ Erreur lors de la connexion:', err);
     res.status(500).json({
+      success: false,
       message: 'Erreur lors de la connexion',
       error: err.message
     });
@@ -199,6 +232,7 @@ router.post('/signin', async (req, res) => {
 router.post('/signout', (req, res) => {
   // Avec JWT, la déconnexion se fait côté client en supprimant le token
   res.json({
+    success: true,
     message: 'Déconnexion réussie'
   });
 });
@@ -210,6 +244,7 @@ router.get('/verify', async (req, res) => {
     
     if (!token) {
       return res.status(401).json({
+        success: false,
         message: 'Token manquant'
       });
     }
@@ -219,30 +254,251 @@ router.get('/verify', async (req, res) => {
     
     if (!user) {
       return res.status(401).json({
+        success: false,
         message: 'Utilisateur non trouvé'
       });
     }
 
     res.json({
+      success: true,
       message: 'Token valide',
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        isActive: user.isActive,
-        profilePhoto: user.profilePhoto
+      data: {
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          isActive: user.isActive,
+          profilePhoto: user.profilePhoto
+        }
       }
     });
 
   } catch (err) {
     res.status(401).json({
+      success: false,
       message: 'Token invalide',
       error: err.message
     });
   }
+});
+
+// ✅ CAPTCHA Generation Route
+const captchaStore = new Map();
+
+router.get('/captcha', (req, res) => {
+  try {
+    const captcha = svgCaptcha.create({
+      size: 4,
+      noise: 2,
+      color: true,
+      background: '#f0f0f0'
+    });
+    
+    const captchaId = crypto.randomBytes(16).toString('hex');
+    captchaStore.set(captchaId, {
+      text: captcha.text,
+      timestamp: Date.now()
+    });
+
+    // Clean up old CAPTCHAs (older than 10 minutes)
+    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+    for (const [id, data] of captchaStore.entries()) {
+      if (data.timestamp < tenMinutesAgo) {
+        captchaStore.delete(id);
+      }
+    }
+
+    res.json({
+      success: true,
+      captchaId,
+      captchaImage: `data:image/svg+xml;base64,${Buffer.from(captcha.data).toString('base64')}`
+    });
+  } catch (err) {
+    console.error('CAPTCHA generation error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate CAPTCHA'
+    });
+  }
+});
+
+// ✅ Forgot Password Route
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      // Don't reveal if email exists or not for security
+      return res.json({
+        success: true,
+        message: 'If the email exists, a reset link has been sent'
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = Date.now() + 60 * 60 * 1000; // 1 hour
+
+    resetTokens.set(resetToken, {
+      userId: user._id,
+      email: user.email,
+      expiry: resetTokenExpiry
+    });
+
+    // In production, send email with reset link
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    await sendResetEmail(user.email, resetLink);
+
+    res.json({
+      success: true,
+      message: 'Password reset instructions sent to your email'
+    });
+
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process password reset request'
+    });
+  }
+});
+
+// ✅ Verify Reset Token Route
+router.get('/verify-reset-token', (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset token is required'
+      });
+    }
+
+    const resetData = resetTokens.get(token);
+    if (!resetData) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid reset token'
+      });
+    }
+
+    if (Date.now() > resetData.expiry) {
+      resetTokens.delete(token);
+      return res.status(400).json({
+        success: false,
+        message: 'Reset token has expired'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Reset token is valid'
+    });
+
+  } catch (err) {
+    console.error('Verify reset token error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify reset token'
+    });
+  }
+});
+
+// ✅ Reset Password Route
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token and new password are required'
+      });
+    }
+
+    const resetData = resetTokens.get(token);
+    if (!resetData) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid reset token'
+      });
+    }
+
+    if (Date.now() > resetData.expiry) {
+      resetTokens.delete(token);
+      return res.status(400).json({
+        success: false,
+        message: 'Reset token has expired'
+      });
+    }
+
+    // Update user password
+    const hashedPassword = await bcrypt.hash(password, 12);
+    await User.findByIdAndUpdate(resetData.userId, {
+      password: hashedPassword
+    });
+
+    // Remove used token
+    resetTokens.delete(token);
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password'
+    });
+  }
+});
+
+// ✅ OAuth Routes (GitHub)
+router.get('/github', (req, res) => {
+  // In production, implement GitHub OAuth
+  // For now, redirect to GitHub OAuth
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${process.env.GITHUB_REDIRECT_URI}`;
+  res.redirect(githubAuthUrl);
+});
+
+router.get('/github/callback', async (req, res) => {
+  // Handle GitHub OAuth callback
+  // This is a placeholder - implement full OAuth flow in production
+  res.json({
+    success: false,
+    message: 'GitHub OAuth not implemented yet'
+  });
+});
+
+// ✅ OAuth Routes (Google)
+router.get('/google', (req, res) => {
+  // In production, implement Google OAuth
+  // For now, redirect to Google OAuth
+  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${process.env.GOOGLE_REDIRECT_URI}&response_type=code&scope=email profile`;
+  res.redirect(googleAuthUrl);
+});
+
+router.get('/google/callback', async (req, res) => {
+  // Handle Google OAuth callback
+  // This is a placeholder - implement full OAuth flow in production
+  res.json({
+    success: false,
+    message: 'Google OAuth not implemented yet'
+  });
 });
 
 module.exports = router;

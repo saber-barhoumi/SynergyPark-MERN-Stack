@@ -38,6 +38,8 @@ const Register2 = () => {
     confirmPassword: false,
   });
 
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
   const togglePasswordVisibility = (field: PasswordField) => {
     setPasswordVisibility((prevState) => ({
       ...prevState,
@@ -50,6 +52,12 @@ const Register2 = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
     setSuccess('');
+  };
+
+  // Handle OAuth registration
+  const handleOAuthRegister = (provider: 'github' | 'google') => {
+    const oauthUrl = `${API_URL}/api/auth/${provider}`;
+    window.location.href = oauthUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -258,48 +266,42 @@ const Register2 = () => {
                         <span className="span-or">Or</span>
                       </div>
                       <div className="mt-2">
-                        <div className="d-flex align-items-center justify-content-center flex-wrap">
-                          <div className="text-center me-2 flex-fill">
-                            <Link
-                              to="#"
-                              className="br-10 p-2 btn btn-info d-flex align-items-center justify-content-center"
+                        <div className="d-flex align-items-center justify-content-center flex-wrap gap-2">
+                          <div className="text-center flex-fill">
+                            <button
+                              type="button"
+                              onClick={() => handleOAuthRegister('github')}
+                              className="br-10 p-2 btn btn-dark w-100 d-flex align-items-center justify-content-center"
+                              disabled={formLoading}
                             >
                               <ImageWithBasePath
                                 className="img-fluid m-1"
-                                src="assets/img/icons/facebook-logo.svg"
-                                alt="Facebook"
+                                src="assets/img/icons/github-logo.svg"
+                                alt="GitHub"
                               />
-                            </Link>
+                              <span className="ms-1">GitHub</span>
+                            </button>
                           </div>
-                          <div className="text-center me-2 flex-fill">
-                            <Link
-                              to="#"
-                              className="br-10 p-2 btn btn-outline-light border d-flex align-items-center justify-content-center"
+                          <div className="text-center flex-fill">
+                            <button
+                              type="button"
+                              onClick={() => handleOAuthRegister('google')}
+                              className="br-10 p-2 btn btn-outline-light border w-100 d-flex align-items-center justify-content-center"
+                              disabled={formLoading}
                             >
                               <ImageWithBasePath
                                 className="img-fluid m-1"
                                 src="assets/img/icons/google-logo.svg"
                                 alt="Google"
                               />
-                            </Link>
-                          </div>
-                          <div className="text-center flex-fill">
-                            <Link
-                              to="#"
-                              className="bg-dark br-10 p-2 btn btn-dark d-flex align-items-center justify-content-center"
-                            >
-                              <ImageWithBasePath
-                                className="img-fluid m-1"
-                                src="assets/img/icons/apple-logo.svg"
-                                alt="Apple"
-                              />
-                            </Link>
+                              <span className="ms-1">Google</span>
+                            </button>
                           </div>
                         </div>
                       </div>
                     </div>
                     <div className="mt-5 pb-4 text-center">
-                      <p className="mb-0 text-gray-9">Copyright © 2024 - Smarthr</p>
+                      <p className="mb-0 text-gray-9">Copyright © 2024 - SynergyPark</p>
                     </div>
                   </div>
                 </form>

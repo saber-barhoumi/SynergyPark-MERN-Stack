@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+/// <reference types="react-scripts" />
+import React, { useEffect, useState, useRef } from "react";
 import ImageWithBasePath from "../../../core/common/imageWithBasePath";
 import { Link, useNavigate } from "react-router-dom";
 import { all_routes } from "../../router/all_routes";
@@ -10,7 +11,10 @@ type PasswordField = "password";
 interface FormData {
   login: string;
   password: string;
+  captcha: string;
 }
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const Login = () => {
   const routes = all_routes;
@@ -20,10 +24,13 @@ const Login = () => {
   // Form state with types
   const [formData, setFormData] = useState<FormData>({
     login: '',
-    password: ''
+    password: '',
+    captcha: ''
   });
   const [formLoading, setFormLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [captchaImage, setCaptchaImage] = useState<string>('');
+  const [captchaId, setCaptchaId] = useState<string>('');
   
   const [passwordVisibility, setPasswordVisibility] = useState({
     password: false,
@@ -39,10 +46,35 @@ const Login = () => {
 
     // Only redirect if user is authenticated AND auth check is complete
     if (isAuthenticated && !loading) {
-      console.log('Redirecting authenticated user to dashboard');
       navigation(routes.adminDashboard, { replace: true });
     }
+    // Do NOT redirect if not authenticated
   }, [isAuthenticated, loading, navigation, routes.adminDashboard]);
+
+  // Load CAPTCHA on component mount
+  useEffect(() => {
+    loadCaptcha();
+  }, []);
+
+  // Load CAPTCHA image
+  const loadCaptcha = async () => {
+    try {
+      const response = await fetch('/api/auth/captcha');
+      const data = await response.json();
+      if (data.success) {
+        setCaptchaImage(data.captchaImage);
+        setCaptchaId(data.captchaId);
+      }
+    } catch (error) {
+      console.error('Failed to load CAPTCHA:', error);
+    }
+  };
+
+  // Handle OAuth login
+  const handleOAuthLogin = (provider: 'github' | 'google') => {
+    const oauthUrl = `${API_URL}/api/auth/${provider}`;
+    window.location.href = oauthUrl;
+  };
 
   // ✅ Fixed with proper typing
   const togglePasswordVisibility = (field: PasswordField) => {
@@ -76,19 +108,35 @@ const Login = () => {
       return;
     }
 
+    // CAPTCHA validation
+    if (!formData.captcha) {
+      setError('Veuillez compléter le CAPTCHA');
+      setFormLoading(false);
+      return;
+    }
+
     try {
       console.log('Attempting signin with:', { login: formData.login });
-      const result = await signin(formData);
+      const result = await signin({
+        ...formData,
+        captchaId
+      });
       
       if (result.success) {
         console.log('Connexion réussie:', result.user);
         // Navigation will be handled by useEffect when isAuthenticated changes
       } else {
         setError(result.message || 'Erreur de connexion');
+        // Reload CAPTCHA on failed login
+        loadCaptcha();
+        setFormData(prev => ({ ...prev, captcha: '' }));
       }
     } catch (err) {
       setError('Erreur de connexion au serveur');
       console.error('Login error:', err);
+      // Reload CAPTCHA on error
+      loadCaptcha();
+      setFormData(prev => ({ ...prev, captcha: '' }));
     } finally {
       setFormLoading(false);
     }
@@ -211,6 +259,57 @@ const Login = () => {
                           ></span>
                         </div>
                       </div>
+
+                      {/* CAPTCHA Section */}
+                      <div className="mb-3">
+                        <label className="form-label">CAPTCHA Verification</label>
+                        <div className="d-flex align-items-center gap-3">
+                          <div className="flex-grow-1">
+                            <input
+                              type="text"
+                              name="captcha"
+                              value={formData.captcha}
+                              onChange={handleInputChange}
+                              className="form-control"
+                              placeholder="Enter CAPTCHA code"
+                              disabled={formLoading}
+                              required
+                            />
+                          </div>
+                          <div className="captcha-image-container">
+                            {captchaImage ? (
+                              <img 
+                                src={captchaImage} 
+                                alt="CAPTCHA" 
+                                className="captcha-image"
+                                style={{ height: '40px', border: '1px solid #ddd', borderRadius: '4px' }}
+                              />
+                            ) : (
+                              <div className="captcha-placeholder" style={{ 
+                                height: '40px', 
+                                width: '120px', 
+                                backgroundColor: '#f8f9fa', 
+                                border: '1px solid #ddd', 
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <span className="text-muted">Loading...</span>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={loadCaptcha}
+                            className="btn btn-outline-secondary btn-sm"
+                            disabled={formLoading}
+                          >
+                            <i className="ti ti-refresh"></i>
+                          </button>
+                        </div>
+                      </div>
+
                       <div className="d-flex align-items-center justify-content-between mb-3">
                         <div className="d-flex align-items-center">
                           <div className="form-check form-check-md mb-0">
@@ -237,7 +336,7 @@ const Login = () => {
                         <button
                           type="submit"
                           className="btn btn-primary w-100"
-                          disabled={formLoading || !formData.login || !formData.password}
+                          disabled={formLoading || !formData.login || !formData.password || !formData.captcha}
                         >
                           {formLoading ? (
                             <>
@@ -262,42 +361,36 @@ const Login = () => {
                         <span className="span-or">Or</span>
                       </div>
                       <div className="mt-2">
-                        <div className="d-flex align-items-center justify-content-center flex-wrap">
-                          <div className="text-center me-2 flex-fill">
-                            <Link
-                              to="#"
-                              className="br-10 p-2 btn btn-info d-flex align-items-center justify-content-center"
+                        <div className="d-flex align-items-center justify-content-center flex-wrap gap-2">
+                          <div className="text-center flex-fill">
+                            <button
+                              type="button"
+                              onClick={() => handleOAuthLogin('github')}
+                              className="br-10 p-2 btn btn-dark w-100 d-flex align-items-center justify-content-center"
+                              disabled={formLoading}
                             >
                               <ImageWithBasePath
                                 className="img-fluid m-1"
-                                src="assets/img/icons/facebook-logo.svg"
-                                alt="Facebook"
+                                src="assets/img/icons/github-logo.svg"
+                                alt="GitHub"
                               />
-                            </Link>
+                              <span className="ms-1">GitHub</span>
+                            </button>
                           </div>
-                          <div className="text-center me-2 flex-fill">
-                            <Link
-                              to="#"
-                              className="br-10 p-2 btn btn-outline-light border d-flex align-items-center justify-content-center"
+                          <div className="text-center flex-fill">
+                            <button
+                              type="button"
+                              onClick={() => handleOAuthLogin('google')}
+                              className="br-10 p-2 btn btn-outline-light border w-100 d-flex align-items-center justify-content-center"
+                              disabled={formLoading}
                             >
                               <ImageWithBasePath
                                 className="img-fluid m-1"
                                 src="assets/img/icons/google-logo.svg"
                                 alt="Google"
                               />
-                            </Link>
-                          </div>
-                          <div className="text-center flex-fill">
-                            <Link
-                              to="#"
-                              className="bg-dark br-10 p-2 btn btn-dark d-flex align-items-center justify-content-center"
-                            >
-                              <ImageWithBasePath
-                                className="img-fluid m-1"
-                                src="assets/img/icons/apple-logo.svg"
-                                alt="Apple"
-                              />
-                            </Link>
+                              <span className="ms-1">Google</span>
+                            </button>
                           </div>
                         </div>
                       </div>

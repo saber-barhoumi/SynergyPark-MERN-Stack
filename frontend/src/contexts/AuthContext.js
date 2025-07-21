@@ -24,18 +24,30 @@ export const AuthProvider = ({ children }) => {
   const checkAuthStatus = async () => {
     try {
       const token = localStorage.getItem('token');
+      console.log('[AuthContext] checkAuthStatus: token in localStorage:', token);
       if (token) {
         const response = await authAPI.verifyToken();
         if (response.data.success) {
           setUser(response.data.data.user);
           setIsAuthenticated(true);
+          console.log('[AuthContext] checkAuthStatus: user authenticated');
         } else {
           localStorage.removeItem('token');
+          setUser(null);
+          setIsAuthenticated(false);
+          console.log('[AuthContext] checkAuthStatus: token invalid, set unauthenticated');
         }
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+        console.log('[AuthContext] checkAuthStatus: no token, set unauthenticated');
       }
     } catch (error) {
       console.error('Auth check failed:', error);
       localStorage.removeItem('token');
+      setUser(null);
+      setIsAuthenticated(false);
+      console.log('[AuthContext] checkAuthStatus: error, set unauthenticated');
     } finally {
       setLoading(false);
     }
@@ -84,6 +96,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     authAPI.signout().catch(console.error);
+    console.log('[AuthContext] signout: token removed, set unauthenticated');
   };
 
   const value = {

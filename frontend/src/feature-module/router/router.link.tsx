@@ -291,13 +291,21 @@ import Promotion from "../hrm/promotion";
 import Trainers from "../training/trainers";
 import TrainingList from "../training/trainingList";
 import Invoices from "../finance-accounts/sales/invoices";
+import { useAuth } from "../../contexts/AuthContext";
+
+function RootRedirect() {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return <div style={{textAlign:'center',marginTop:'2rem'}}>Loading...</div>; // Show spinner or nothing while loading
+  return isAuthenticated ? <Navigate to="/index" /> : <Navigate to="/login" />;
+}
+
 const routes = all_routes;
 
 export const publicRoutes = [
   {
     path: "/",
     name: "Root",
-    element: <Navigate to="/index" />,
+    element: <RootRedirect />,
     route: Route,
   },
   {

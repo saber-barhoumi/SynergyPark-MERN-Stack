@@ -135,6 +135,28 @@ export const authAPI = {
       console.error('Reset password API error:', error);
       throw error;
     }
+  },
+
+  // Verify reset token
+  verifyResetToken: async (token) => {
+    try {
+      const response = await apiClient.get(`/api/auth/verify-reset-token?token=${token}`);
+      return response;
+    } catch (error) {
+      console.error('Verify reset token API error:', error);
+      throw error;
+    }
+  },
+
+  // Generate CAPTCHA
+  generateCaptcha: async () => {
+    try {
+      const response = await apiClient.get('/api/auth/captcha');
+      return response;
+    } catch (error) {
+      console.error('Generate CAPTCHA API error:', error);
+      throw error;
+    }
   }
 };
 
@@ -156,6 +178,16 @@ export const userAPI = {
       return response;
     } catch (error) {
       console.error('Update profile API error:', error);
+      throw error;
+    }
+  },
+
+  changePassword: async (passwordData) => {
+    try {
+      const response = await apiClient.put('/api/user/change-password', passwordData);
+      return response;
+    } catch (error) {
+      console.error('Change password API error:', error);
       throw error;
     }
   }

@@ -207,6 +207,20 @@ const Register2 = () => {
                         </div>
                       </div>
                       <div className="mb-3">
+                        <label className="form-label">Role</label>
+                        <select
+                          name="role"
+                          value={formData.role}
+                          onChange={handleInputChange}
+                          className="form-control"
+                          required
+                        >
+                          <option value="STARTUP">STARTUP</option>
+                          <option value="EXPERT">EXPERT</option>
+                          <option value="S2T">S2T</option>
+                        </select>
+                      </div>
+                      <div className="mb-3">
                         <label className="form-label">Password</label>
                         <div className="pass-group">
                           <input
@@ -240,7 +254,6 @@ const Register2 = () => {
                           ></span>
                         </div>
                       </div>
-                      <input type="hidden" name="role" value="STARTUP" />
                       <div className="mb-3">
                         <button type="submit" className="btn btn-primary w-100" disabled={formLoading || loading}>
                           {formLoading || loading ? "Signing Up..." : "Sign Up"}

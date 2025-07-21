@@ -54,6 +54,7 @@ app.use(cors({
 
 
 app.use(express.json({ limit: '10mb' }));
+app.use('/api/auth', require('./routes/auth'));
 
 // 📝 Request Logging Middleware
 app.use((req, res, next) => {
