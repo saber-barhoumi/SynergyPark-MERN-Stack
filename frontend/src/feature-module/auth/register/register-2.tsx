@@ -93,7 +93,16 @@ const Register2 = () => {
       if (result.success) {
         setSuccess('Account created! Redirecting...');
         setTimeout(() => {
-          navigate(routes.login2); // or routes.adminDashboard for auto-login
+          // Redirect based on user role
+          if (formData.role === 'S2T') {
+            navigate(routes.adminDashboard);
+          } else if (formData.role === 'STARTUP') {
+            navigate(routes.employeeDashboard);
+          } else if (formData.role === 'EXPERT') {
+            navigate(routes.dealsDashboard);
+          } else {
+            navigate(routes.login2); // fallback
+          }
         }, 1000);
       } else {
         setError(result.message || "Registration failed");

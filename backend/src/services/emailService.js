@@ -9,10 +9,16 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// To send real emails, set EMAIL_USER and EMAIL_PASS in your environment.
+// EMAIL_USER should be your Gmail address (or SMTP user), EMAIL_PASS should be a Gmail App Password (not your Gmail login password).
+// In development, if these are not set, the reset link will be logged to the console for testing.
 async function sendResetEmail(to, resetLink) {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     // Fallback for development: log the reset link
-    console.log(`[DEV] Password reset link for ${to}: ${resetLink}`);
+    console.log('\n==============================');
+    console.log('[DEV] Password reset link for', to, ':');
+    console.log(resetLink);
+    console.log('==============================\n');
     return Promise.resolve();
   }
   const mailOptions = {

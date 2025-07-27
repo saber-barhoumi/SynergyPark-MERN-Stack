@@ -1,5 +1,5 @@
 /// <reference types="react-scripts" />
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react"; // removed useRef
 import ImageWithBasePath from "../../../core/common/imageWithBasePath";
 import { Link, useNavigate } from "react-router-dom";
 import { all_routes } from "../../router/all_routes";
@@ -26,7 +26,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 const Login = () => {
   const routes = all_routes;
   const navigation = useNavigate();
-  const { signin, isAuthenticated, loading } = useAuth();
+  const { signin, isAuthenticated, loading, user } = useAuth(); // <-- add user
 
   // Form state with types
   const [formData, setFormData] = useState<FormData>({
@@ -53,10 +53,20 @@ const Login = () => {
 
     // Only redirect if user is authenticated AND auth check is complete
     if (isAuthenticated && !loading) {
-      navigation(routes.adminDashboard, { replace: true });
+      // Role-based redirect
+      const role = user?.role;
+      if (role === 'STARTUP') {
+        navigation('/employee-dashboard', { replace: true });
+      } else if (role === 'S2T') {
+        navigation('/index', { replace: true });
+      } else if (role === 'EXPERT') {
+        navigation('/leads-dashboard', { replace: true });
+      } else {
+        navigation(routes.adminDashboard, { replace: true }); // fallback
+      }
     }
     // Do NOT redirect if not authenticated
-  }, [isAuthenticated, loading, navigation, routes.adminDashboard]);
+  }, [isAuthenticated, loading, navigation, user, routes.adminDashboard]);
 
   // Load CAPTCHA on component mount
   // useEffect(() => { loadCaptcha(); }, []);

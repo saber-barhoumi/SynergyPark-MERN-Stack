@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const svgCaptcha = require('svg-captcha');
 const { User, UserRole } = require('../models/User');
 const { sendResetEmail } = require('../services/emailService');
+const userController = require('../controllers/userController');
 
 // JWT Secret (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
@@ -325,54 +326,11 @@ router.get('/captcha', (req, res) => {
   }
 });
 
-// ✅ Forgot Password Route
-router.post('/forgot-password', async (req, res) => {
-  try {
-    const { email } = req.body;
+// ✅ Forgot Password Route (replace with controller)
+router.post('/forgot-password', userController.forgotPassword);
 
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is required'
-      });
-    }
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      // Don't reveal if email exists or not for security
-      return res.json({
-        success: true,
-        message: 'If the email exists, a reset link has been sent'
-      });
-    }
-
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = Date.now() + 60 * 60 * 1000; // 1 hour
-
-    resetTokens.set(resetToken, {
-      userId: user._id,
-      email: user.email,
-      expiry: resetTokenExpiry
-    });
-
-    // In production, send email with reset link
-    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
-    await sendResetEmail(user.email, resetLink);
-
-    res.json({
-      success: true,
-      message: 'Password reset instructions sent to your email'
-    });
-
-  } catch (err) {
-    console.error('Forgot password error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to process password reset request'
-    });
-  }
-});
+// ✅ Reset Password Route (replace with controller)
+router.post('/reset-password', userController.resetPassword);
 
 // ✅ Verify Reset Token Route
 router.get('/verify-reset-token', (req, res) => {
@@ -412,57 +370,6 @@ router.get('/verify-reset-token', (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to verify reset token'
-    });
-  }
-});
-
-// ✅ Reset Password Route
-router.post('/reset-password', async (req, res) => {
-  try {
-    const { token, password } = req.body;
-
-    if (!token || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Token and new password are required'
-      });
-    }
-
-    const resetData = resetTokens.get(token);
-    if (!resetData) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid reset token'
-      });
-    }
-
-    if (Date.now() > resetData.expiry) {
-      resetTokens.delete(token);
-      return res.status(400).json({
-        success: false,
-        message: 'Reset token has expired'
-      });
-    }
-
-    // Update user password
-    const hashedPassword = await bcrypt.hash(password, 12);
-    await User.findByIdAndUpdate(resetData.userId, {
-      password: hashedPassword
-    });
-
-    // Remove used token
-    resetTokens.delete(token);
-
-    res.json({
-      success: true,
-      message: 'Password reset successfully'
-    });
-
-  } catch (err) {
-    console.error('Reset password error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to reset password'
     });
   }
 });

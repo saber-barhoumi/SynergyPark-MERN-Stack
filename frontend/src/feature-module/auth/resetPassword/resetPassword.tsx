@@ -36,6 +36,8 @@ const ResetPassword = () => {
     key: "",
   });
 
+  const [manualToken, setManualToken] = useState('');
+
   // Check if token is valid on component mount
   useEffect(() => {
     if (!token) {
@@ -168,6 +170,12 @@ const ResetPassword = () => {
   };
 
   if (!token) {
+    const handleManualTokenSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (manualToken) {
+        navigation(`${routes.resetPassword}?token=${manualToken}`);
+      }
+    };
     return (
       <div className="container-fuild">
         <div className="w-100 overflow-hidden position-relative flex-wrap d-block vh-100">
@@ -176,7 +184,19 @@ const ResetPassword = () => {
               <div className="alert alert-danger">
                 <h4>Invalid Reset Link</h4>
                 <p>Please request a new password reset link.</p>
-                <Link to={routes.forgotPassword} className="btn btn-primary">
+                <form onSubmit={handleManualTokenSubmit} className="mb-3">
+                  <label htmlFor="manualToken">Paste your reset token here:</label>
+                  <input
+                    id="manualToken"
+                    type="text"
+                    className="form-control my-2"
+                    value={manualToken}
+                    onChange={e => setManualToken(e.target.value)}
+                    placeholder="Enter reset token"
+                  />
+                  <button type="submit" className="btn btn-primary">Continue</button>
+                </form>
+                <Link to={routes.forgotPassword} className="btn btn-secondary">
                   Request New Reset Link
                 </Link>
               </div>

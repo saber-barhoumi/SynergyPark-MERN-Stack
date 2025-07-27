@@ -1737,6 +1737,17 @@ export const SidebarDataTest = [
             link: routes.chartJs,
             base: 'chart-js',
           },
+          // --- Add new button for Company Profile Statistics ---
+          {
+            label: 'Company Profile Statistics',
+            link: '/company-overview-dashboard', // or routes.companyOverviewDashboard if defined
+            base: 'company-profile-statistics',
+            icon: 'chart-pie',
+            materialicons: 'insights',
+            submenu: false,
+            showSubRoute: false,
+            submenuItems: [],
+          },
         ],
       },
       {

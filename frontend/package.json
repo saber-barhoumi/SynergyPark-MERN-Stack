@@ -31,6 +31,8 @@
     "clipboard-copy": "^4.0.1",
     "dragula": "^3.7.3",
     "feather-icons-react": "^0.7.0",
+    "file-saver": "^2.0.5",
+    "html2canvas": "^1.4.1",
     "jquery": "^3.7.1",
     "leaflet": "^1.9.4",
     "moment": "^2.30.1",
@@ -104,6 +106,7 @@
   "devDependencies": {
     "@types/bootstrap": "^5.2.10",
     "@types/dragula": "^3.7.5",
+    "@types/file-saver": "^2.0.7",
     "@types/leaflet": "^1.9.15",
     "@types/node": "^20.14.7",
     "@types/react": "^18.3.13",

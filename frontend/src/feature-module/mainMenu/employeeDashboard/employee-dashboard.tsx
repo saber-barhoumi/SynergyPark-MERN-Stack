@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import ImageWithBasePath from "../../../core/common/imageWithBasePath";
 import { all_routes } from "../../router/all_routes";
@@ -11,12 +11,30 @@ import { Calendar } from 'primereact/calendar';
 import { DatePicker } from "antd";
 import CommonSelect from "../../../core/common/commonSelect";
 import CollapseHeader from "../../../core/common/collapse-header/collapse-header";
+import { useCompanyProfile } from "../../../hooks/useCompanyProfile";
+import CompanyProfileModal from "../../modals/companyProfileModal";
+import { useUser } from "../../../hooks/useUser";
+import "./employee-dashboard.css";
 
 
 const EmployeeDashboard = () => {
   const routes = all_routes;
+  const { shouldShowModal, refreshProfileData } = useCompanyProfile();
+  const { user, userStats, loading: userLoading, error: userError } = useUser();
+  const [showCompanyProfileModal, setShowCompanyProfileModal] = useState(false);
 
   const [date, setDate] = useState(new Date('2024'));
+
+  // Show modal after 1 minute if user is STARTUP and profile is incomplete
+  useEffect(() => {
+    if (shouldShowModal) {
+      const timer = setTimeout(() => {
+        setShowCompanyProfileModal(true);
+      }, 60000); // 1 minute
+
+      return () => clearTimeout(timer);
+    }
+  }, [shouldShowModal]);
 
   //New Chart
   const [leavesChart] = useState<any>({
@@ -199,28 +217,67 @@ const EmployeeDashboard = () => {
           </div>
           <div className="row">
             <div className="col-xl-4 d-flex">
-              <div className="card position-relative flex-fill">
+              <div className="card position-relative flex-fill user-profile-card">
                 <div className="card-header bg-dark">
                   <div className="d-flex align-items-center">
                     <span className="avatar avatar-lg avatar-rounded border border-white border-2 flex-shrink-0 me-2">
-                      <ImageWithBasePath src="assets/img/users/user-01.jpg" alt="Img" />
+                      {userLoading ? (
+                        <div className="d-flex align-items-center justify-content-center bg-light rounded-circle" style={{ width: '60px', height: '60px' }}>
+                          <div className="spinner-border spinner-border-sm text-white" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                          </div>
+                        </div>
+                      ) : user?.avatar ? (
+                        <ImageWithBasePath src={user.avatar} alt="User Avatar" />
+                      ) : (
+                        <ImageWithBasePath src="assets/img/users/user-01.jpg" alt="Default Avatar" />
+                      )}
                     </span>
                     <div>
-                      <h5 className="text-white mb-1">Stephan Peralt</h5>
+                      <h5 className="text-white mb-1">
+                        {userLoading ? (
+                          <div className="placeholder-glow">
+                            <span className="placeholder col-8"></span>
+                          </div>
+                        ) : user ? (
+                          `${user.firstName} ${user.lastName}`
+                        ) : (
+                          'User Not Found'
+                        )}
+                      </h5>
                       <div className="d-flex align-items-center">
                         <p className="text-white fs-12 mb-0">
-                          Senior Product Designer
+                          {userLoading ? (
+                            <div className="placeholder-glow">
+                              <span className="placeholder col-6"></span>
+                            </div>
+                          ) : user?.position ? (
+                            user.position
+                          ) : (
+                            'Position Not Set'
+                          )}
                         </p>
                         <span className="mx-1">
                           <i className="ti ti-point-filled text-primary" />
                         </span>
-                        <p className="fs-12">UI/UX Design</p>
+                        <p className="fs-12">
+                          {userLoading ? (
+                            <div className="placeholder-glow">
+                              <span className="placeholder col-4"></span>
+                            </div>
+                          ) : user?.department ? (
+                            user.department
+                          ) : (
+                            'Department Not Set'
+                          )}
+                        </p>
                       </div>
                     </div>
                   </div>
                   <Link
                     to="#"
                     className="btn btn-icon btn-sm text-white rounded-circle edit-top"
+                    title="Edit Profile"
                   >
                     <i className="ti ti-edit" />
                   </Link>
@@ -228,20 +285,76 @@ const EmployeeDashboard = () => {
                 <div className="card-body">
                   <div className="mb-3">
                     <span className="d-block mb-1 fs-13">Phone Number</span>
-                    <p className="text-gray-9">+1 324 3453 545</p>
+                    <p className="text-gray-9">
+                      {userLoading ? (
+                        <div className="placeholder-glow">
+                          <span className="placeholder col-6"></span>
+                        </div>
+                      ) : user?.phone ? (
+                        user.phone
+                      ) : (
+                        'Phone Not Set'
+                      )}
+                    </p>
                   </div>
                   <div className="mb-3">
                     <span className="d-block mb-1 fs-13">Email Address</span>
-                    <p className="text-gray-9">Steperde124@example.com</p>
+                    <p className="text-gray-9">
+                      {userLoading ? (
+                        <div className="placeholder-glow">
+                          <span className="placeholder col-8"></span>
+                        </div>
+                      ) : user?.email ? (
+                        user.email
+                      ) : (
+                        'Email Not Available'
+                      )}
+                    </p>
                   </div>
                   <div className="mb-3">
-                    <span className="d-block mb-1 fs-13">Report Office</span>
-                    <p className="text-gray-9">Doglas Martini</p>
+                    <span className="d-block mb-1 fs-13">Department</span>
+                    <p className="text-gray-9">
+                      {userLoading ? (
+                        <div className="placeholder-glow">
+                          <span className="placeholder col-5"></span>
+                        </div>
+                      ) : user?.department ? (
+                        user.department
+                      ) : (
+                        'Department Not Set'
+                      )}
+                    </p>
                   </div>
                   <div>
                     <span className="d-block mb-1 fs-13">Joined on</span>
-                    <p className="text-gray-9">15 Jan 2024</p>
+                    <p className="text-gray-9">
+                      {userLoading ? (
+                        <div className="placeholder-glow">
+                          <span className="placeholder col-4"></span>
+                        </div>
+                      ) : user?.hireDate ? (
+                        new Date(user.hireDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })
+                      ) : user?.createdAt ? (
+                        new Date(user.createdAt).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })
+                      ) : (
+                        'Date Not Available'
+                      )}
+                    </p>
                   </div>
+                  {userError && (
+                    <div className="alert alert-danger mt-3" role="alert">
+                      <i className="ti ti-alert-circle me-2"></i>
+                      Error loading user data: {userError}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -409,37 +522,97 @@ const EmployeeDashboard = () => {
                     <div className="col-sm-6">
                       <div className="mb-3">
                         <span className="d-block mb-1">Total Leaves</span>
-                        <h4>16</h4>
+                        <h4>
+                          {userLoading ? (
+                            <div className="placeholder-glow">
+                              <span className="placeholder col-2"></span>
+                            </div>
+                          ) : userStats ? (
+                            userStats.leavesTaken + userStats.leavesRemaining
+                          ) : (
+                            '16'
+                          )}
+                        </h4>
                       </div>
                     </div>
                     <div className="col-sm-6">
                       <div className="mb-3">
                         <span className="d-block mb-1">Taken</span>
-                        <h4>10</h4>
+                        <h4>
+                          {userLoading ? (
+                            <div className="placeholder-glow">
+                              <span className="placeholder col-2"></span>
+                            </div>
+                          ) : userStats ? (
+                            userStats.leavesTaken
+                          ) : (
+                            '10'
+                          )}
+                        </h4>
                       </div>
                     </div>
                     <div className="col-sm-6">
                       <div className="mb-3">
-                        <span className="d-block mb-1">Absent</span>
-                        <h4>2</h4>
+                        <span className="d-block mb-1">Remaining</span>
+                        <h4>
+                          {userLoading ? (
+                            <div className="placeholder-glow">
+                              <span className="placeholder col-2"></span>
+                            </div>
+                          ) : userStats ? (
+                            userStats.leavesRemaining
+                          ) : (
+                            '6'
+                          )}
+                        </h4>
                       </div>
                     </div>
                     <div className="col-sm-6">
                       <div className="mb-3">
-                        <span className="d-block mb-1">Request</span>
-                        <h4>0</h4>
+                        <span className="d-block mb-1">Attendance Rate</span>
+                        <h4>
+                          {userLoading ? (
+                            <div className="placeholder-glow">
+                              <span className="placeholder col-3"></span>
+                            </div>
+                          ) : userStats ? (
+                            `${userStats.attendanceRate}%`
+                          ) : (
+                            '95%'
+                          )}
+                        </h4>
                       </div>
                     </div>
                     <div className="col-sm-6">
                       <div className="mb-3">
-                        <span className="d-block mb-1">Worked Days</span>
-                        <h4>240</h4>
+                        <span className="d-block mb-1">Total Hours</span>
+                        <h4>
+                          {userLoading ? (
+                            <div className="placeholder-glow">
+                              <span className="placeholder col-3"></span>
+                            </div>
+                          ) : userStats ? (
+                            userStats.totalHours
+                          ) : (
+                            '240'
+                          )}
+                        </h4>
                       </div>
                     </div>
                     <div className="col-sm-6">
                       <div className="mb-3">
-                        <span className="d-block mb-1">Loss of Pay</span>
-                        <h4>2</h4>
+                        <span className="d-block mb-1">Performance</span>
+                        <h4>
+                          {userLoading ? (
+                            <div className="placeholder-glow">
+                              <span className="placeholder col-3"></span>
+                            </div>
+                          ) : userStats ? (
+                            `${userStats.performanceScore}%`
+                          ) : (
+                            '85%'
+                          )}
+                        </h4>
                       </div>
                     </div>
                     <div className="col-sm-12">
@@ -1343,9 +1516,27 @@ const EmployeeDashboard = () => {
                 <div className="card-body">
                   <div>
                     <div className="bg-light d-flex align-items-center rounded p-2">
-                      <h3 className="me-2">98%</h3>
+                      <h3 className="me-2">
+                        {userLoading ? (
+                          <div className="placeholder-glow">
+                            <span className="placeholder col-3"></span>
+                          </div>
+                        ) : userStats ? (
+                          `${userStats.performanceScore}%`
+                        ) : (
+                          '98%'
+                        )}
+                      </h3>
                       <span className="badge badge-outline-success bg-success-transparent rounded-pill me-1">
-                        12%
+                        {userLoading ? (
+                          <div className="placeholder-glow">
+                            <span className="placeholder col-2"></span>
+                          </div>
+                        ) : userStats ? (
+                          `${Math.max(0, userStats.performanceScore - 85)}%`
+                        ) : (
+                          '12%'
+                        )}
                       </span>
                       <span>vs last years</span>
                     </div>
@@ -2069,6 +2260,15 @@ const EmployeeDashboard = () => {
         {/* /Add Leaves */}
       </>
 
+      {/* Company Profile Modal */}
+      <CompanyProfileModal
+        isOpen={showCompanyProfileModal}
+        onClose={() => setShowCompanyProfileModal(false)}
+        onSuccess={() => {
+          refreshProfileData();
+          setShowCompanyProfileModal(false);
+        }}
+      />
     </>
 
 

@@ -61,6 +61,25 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('token', token);
         setUser(user);
         setIsAuthenticated(true);
+        
+        // Check if STARTUP user needs to complete company profile
+        if (user.role === 'STARTUP') {
+          try {
+            const profileResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/company-profile/check/${user.id}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            const profileData = await profileResponse.json();
+            if (profileData.success && !profileData.data.isProfileComplete) {
+              // Profile is incomplete, but we'll let the dashboard handle the modal
+              console.log('STARTUP user profile incomplete');
+            }
+          } catch (profileError) {
+            console.error('Error checking profile completion:', profileError);
+          }
+        }
+        
         return { success: true, user };
       }
       return { success: false, message: response.data.message };

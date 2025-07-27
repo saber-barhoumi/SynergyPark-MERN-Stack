@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
   lastLogin: { type: Date, default: null },
   isActive: { type: Boolean, default: true },
   profilePhoto: { type: String, default: '' },
+  avatar: { type: String, default: '' },
   
   // ✅ Additional Profile Fields
   phone: { type: String, default: '' },
@@ -27,6 +28,29 @@ const userSchema = new mongoose.Schema({
   state: { type: String, default: '' },
   city: { type: String, default: '' },
   postalCode: { type: String, default: '' },
+  
+  // ✅ Employee/User Profile Fields
+  department: { type: String, default: '' },
+  position: { type: String, default: '' },
+  hireDate: { type: Date, default: null },
+  salary: { type: Number, default: 0 },
+  emergencyContact: {
+    name: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    relationship: { type: String, default: '' }
+  },
+  skills: [{ type: String }],
+  education: [{
+    degree: { type: String, default: '' },
+    institution: { type: String, default: '' },
+    year: { type: String, default: '' }
+  }],
+  experience: [{
+    company: { type: String, default: '' },
+    position: { type: String, default: '' },
+    duration: { type: String, default: '' },
+    description: { type: String, default: '' }
+  }],
   
   // ✅ Password Reset Fields
   resetPasswordToken: { type: String, default: null },

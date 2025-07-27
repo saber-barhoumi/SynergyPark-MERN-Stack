@@ -71,6 +71,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/user', require('./routes/userRoutes'));
+app.use('/api/company-profile', require('./routes/companyProfile'));
 
 // 📝 Request Logging Middleware
 app.use((req, res, next) => {

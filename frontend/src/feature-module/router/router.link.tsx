@@ -292,6 +292,7 @@ import Trainers from "../training/trainers";
 import TrainingList from "../training/trainingList";
 import Invoices from "../finance-accounts/sales/invoices";
 import { useAuth } from "../../contexts/AuthContext";
+import CompanyOverviewDashboard from '../uiInterface/charts/CompanyOverviewDashboard';
 
 function RootRedirect() {
   const { isAuthenticated, loading } = useAuth();
@@ -418,6 +419,11 @@ export const publicRoutes = [
   {
     path: routes.superAdminDashboard,
     element: <SuperAdminDashboard />,
+    route: Route,
+  },
+  {
+    path: routes.companyOverviewDashboard,
+    element: <CompanyOverviewDashboard />,
     route: Route,
   },
 

@@ -41,19 +41,29 @@ router.get('/profile', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       data: {
-        id: user._id,
+        _id: user._id,
         username: user.username,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
-        profilePhoto: user.profilePhoto,
+        avatar: user.avatar || user.profilePhoto,
         phone: user.phone,
         address: user.address,
         country: user.country,
         state: user.state,
         city: user.city,
-        postalCode: user.postalCode
+        postalCode: user.postalCode,
+        department: user.department,
+        position: user.position,
+        hireDate: user.hireDate,
+        salary: user.salary,
+        emergencyContact: user.emergencyContact,
+        skills: user.skills,
+        education: user.education,
+        experience: user.experience,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
       }
     });
   } catch (err) {
@@ -167,6 +177,88 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'User deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Upload Avatar
+router.post('/:id/avatar', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!req.files || !req.files.avatar) {
+      return res.status(400).json({
+        success: false,
+        message: 'No avatar file uploaded'
+      });
+    }
+
+    const avatar = req.files.avatar;
+    const fileName = `${Date.now()}-${avatar.name}`;
+    const uploadPath = path.join(__dirname, '../../uploads/profiles', fileName);
+    
+    // Ensure directory exists
+    if (!fs.existsSync(path.dirname(uploadPath))) {
+      fs.mkdirSync(path.dirname(uploadPath), { recursive: true });
+    }
+    
+    // Move the uploaded file
+    await avatar.mv(uploadPath);
+    
+    // Update user with new avatar
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      { avatar: `/uploads/profiles/${fileName}` },
+      { new: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Avatar uploaded successfully',
+      data: {
+        avatar: updatedUser.avatar
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
+// ✅ Get User Stats
+router.get('/:id/stats', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // For now, return mock stats. In a real application, you would calculate these from actual data
+    const mockStats = {
+      totalProjects: 12,
+      completedProjects: 8,
+      totalHours: 240,
+      averageRating: 4.5,
+      leavesTaken: 10,
+      leavesRemaining: 6,
+      attendanceRate: 95,
+      performanceScore: 87
+    };
+
+    res.json({
+      success: true,
+      data: mockStats
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
   }
 });
 

@@ -52,9 +52,9 @@ const ForgotPassword = () => {
     try {
       const response = await authAPI.forgotPassword(formData.email);
       if (response.data.success) {
-        setSuccess('Password reset instructions have been sent to your email');
+        setSuccess('Password reset instructions have been sent to your email. Please check your inbox.');
         setTimeout(() => {
-          navigation(routes.login);
+          navigation(routes.resetPassword);
         }, 3000);
       } else {
         setError(response.data.message || 'Failed to send reset email');
