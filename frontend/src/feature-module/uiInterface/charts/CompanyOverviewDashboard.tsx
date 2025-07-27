@@ -2,10 +2,24 @@ import React, { useEffect, useState, useRef } from "react";
 import { useUser } from "../../../hooks/useUser";
 import { Chart as PrimeChart } from "primereact/chart";
 import ReactApexChart from "react-apexcharts";
-import { Bar, Pie, Doughnut } from "react-chartjs-2";
+import { Bar, Pie, Doughnut, Line } from "react-chartjs-2";
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend } from "chart.js";
 import html2canvas from "html2canvas";
 import { saveAs } from "file-saver";
 import { Link } from "react-router-dom";
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -23,8 +37,8 @@ const CompanyOverviewDashboard = () => {
     supportNeeded: useRef<HTMLDivElement>(null),
     approvalRate: useRef<HTMLDivElement>(null),
     companyAge: useRef<HTMLDivElement>(null),
-    map: useRef<HTMLDivElement>(null),
     stackedDomain: useRef<HTMLDivElement>(null),
+    revenueTrend: useRef<HTMLDivElement>(null),
   };
 
   useEffect(() => {
@@ -81,7 +95,7 @@ const CompanyOverviewDashboard = () => {
     return counts;
   };
 
-  // Pie/Donut: Activity Domain
+  // ChartJS Data
   const activityDomainCounts = countByField('activityDomain');
   const activityDomainData = {
     labels: Object.keys(activityDomainCounts),
@@ -91,241 +105,533 @@ const CompanyOverviewDashboard = () => {
         backgroundColor: [
           '#42A5F5', '#66BB6A', '#FF7043', '#FFEB3B', '#AB47BC', '#26A69A', '#FFA726', '#8D6E63', '#789262', '#D4E157', '#5C6BC0', '#EC407A', '#BDBDBD'
         ],
+        borderWidth: 2,
+        borderColor: '#fff'
       },
     ],
   };
 
-  // Donut: Project Progress
   const projectProgressCounts = countByField('projectProgress');
   const projectProgressData = {
     labels: Object.keys(projectProgressCounts),
     datasets: [
       {
         data: Object.values(projectProgressCounts),
-        backgroundColor: ['#42A5F5', '#66BB6A', '#FF7043', '#FFEB3B', '#AB47BC', '#26A69A'],
+        backgroundColor: [
+          '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'
+        ],
+        borderWidth: 2,
+        borderColor: '#fff'
       },
     ],
   };
 
-  // Bar: Staff Range
   const staffRangeCounts = countByField('staffRange');
   const staffRangeData = {
     labels: Object.keys(staffRangeCounts),
     datasets: [
       {
-        label: 'Companies',
+        label: 'Number of Companies',
         data: Object.values(staffRangeCounts),
         backgroundColor: '#42A5F5',
-      },
-    ],
+        borderColor: '#42A5F5',
+        borderWidth: 2
+      }
+    ]
   };
 
-  // Horizontal Bar: Support Needed
-  const supportNeededCounts = countByField('supportNeeded');
+  // ApexCharts Data
+  const approvalRateData = {
+    series: [profiles.filter(p => p.requestStatus === 'APPROVED').length, 
+             profiles.filter(p => p.requestStatus === 'PENDING').length,
+             profiles.filter(p => p.requestStatus === 'REJECTED').length],
+    options: {
+      chart: {
+        height: 350,
+        type: 'radialBar' as const,
+        toolbar: { show: false }
+      },
+      plotOptions: {
+        radialBar: {
+          dataLabels: {
+            name: { fontSize: '22px' },
+            value: { fontSize: '16px' },
+            total: {
+              show: true,
+              label: 'Total',
+              formatter: function () {
+                return profiles.length.toString();
+              }
+            }
+          }
+        }
+      },
+      labels: ['Approved', 'Pending', 'Rejected'],
+      colors: ['#66BB6A', '#FFA726', '#EF5350']
+    }
+  };
+
+  const revenueTrendData = {
+    series: [{
+      name: 'Revenue Growth',
+      data: [30, 40, 35, 50, 49, 60, 70, 91, 125]
+    }],
+    options: {
+      chart: {
+        height: 350,
+        type: 'line' as const,
+        zoom: { enabled: false },
+        toolbar: { show: false }
+      },
+      dataLabels: { enabled: false },
+      stroke: { curve: 'straight' as const },
+      grid: {
+        row: {
+          colors: ['#f3f3f3', 'transparent'],
+          opacity: 0.5
+        }
+      },
+      xaxis: {
+        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']
+      },
+      colors: ['#42A5F5']
+    }
+  };
+
+  // PrimeReact Chart Data
+  const stackedDomainData = {
+    labels: Object.keys(activityDomainCounts),
+    datasets: [
+      {
+        label: 'Approved',
+        data: Object.keys(activityDomainCounts).map(domain => 
+          profiles.filter(p => p.activityDomain === domain && p.requestStatus === 'APPROVED').length
+        ),
+        backgroundColor: '#66BB6A'
+      },
+      {
+        label: 'Pending',
+        data: Object.keys(activityDomainCounts).map(domain => 
+          profiles.filter(p => p.activityDomain === domain && p.requestStatus === 'PENDING').length
+        ),
+        backgroundColor: '#FFA726'
+      },
+      {
+        label: 'Rejected',
+        data: Object.keys(activityDomainCounts).map(domain => 
+          profiles.filter(p => p.activityDomain === domain && p.requestStatus === 'REJECTED').length
+        ),
+        backgroundColor: '#EF5350'
+      }
+    ]
+  };
+
   const supportNeededData = {
-    labels: Object.keys(supportNeededCounts),
+    labels: Object.keys(countByField('supportNeeded')),
     datasets: [
       {
-        label: 'Companies',
-        data: Object.values(supportNeededCounts),
-        backgroundColor: '#66BB6A',
-      },
-    ],
+        data: Object.values(countByField('supportNeeded')),
+        backgroundColor: ['#FF7043', '#66BB6A', '#42A5F5', '#FFEB3B', '#AB47BC']
+      }
+    ]
   };
 
-  // Gauge: Approval Rate
-  const total = profiles.length;
-  const approved = profiles.filter((p) => p.requestStatus === 'APPROVED').length;
-  const approvalRate = total ? Math.round((approved / total) * 100) : 0;
-
-  // Timeline: Company Age
-  const companyAges = profiles.map((p) => p.companyCreationDate ? new Date(p.companyCreationDate) : null).filter(Boolean) as Date[];
-  companyAges.sort((a, b) => a.getTime() - b.getTime());
-  const timelineLabels = companyAges.map((d) => d.getFullYear().toString());
-  const timelineCounts: Record<string, number> = {};
-  timelineLabels.forEach((year) => {
-    timelineCounts[year] = (timelineCounts[year] || 0) + 1;
-  });
-  const timelineData = {
-    labels: Object.keys(timelineCounts),
-    datasets: [
-      {
-        label: 'Companies Founded',
-        data: Object.values(timelineCounts),
-        backgroundColor: '#AB47BC',
-      },
-    ],
-  };
-
-  // Map: Company Locations (for now, just show a list)
-  const locations = profiles.map((p) => p.address).filter(Boolean);
-
-  // Stacked Bar: Domain vs Sub-Domain
-  const domainSubdomain: Record<string, Record<string, number>> = {};
-  profiles.forEach((p) => {
-    const domain = p.activityDomain || 'Unknown';
-    const sub = p.activitySubDomain || 'Unknown';
-    if (!domainSubdomain[domain]) domainSubdomain[domain] = {};
-    domainSubdomain[domain][sub] = (domainSubdomain[domain][sub] || 0) + 1;
-  });
-  const stackedLabels = Object.keys(domainSubdomain);
-  const subdomainKeys = Array.from(new Set(profiles.map((p) => p.activitySubDomain || 'Unknown')));
-  const stackedDatasets = subdomainKeys.map((sub) => ({
-    label: sub,
-    data: stackedLabels.map((domain) => domainSubdomain[domain][sub] || 0),
-    backgroundColor: '#' + Math.floor(Math.random()*16777215).toString(16),
-  }));
-  const stackedData = {
-    labels: stackedLabels,
-    datasets: stackedDatasets,
-  };
-
-  if (userLoading || loading) {
-    return <div className="text-center mt-5">Loading dashboard...</div>;
-  }
-  if (error) {
-    return <div className="alert alert-danger mt-5 text-center">{error}</div>;
-  }
-
-  return (
-    <div className="page-wrapper cardhead">
-      <div className="content">
-        <div className="page-header">
+  if (loading) {
+    return (
+      <div className="page-wrapper cardhead">
+        <div className="content">
+          <div className="page-header">
+            <div className="row">
+              <div className="col-sm-12">
+                <h3 className="page-title">Company Overview Dashboard</h3>
+              </div>
+            </div>
+          </div>
           <div className="row">
-            <div className="col-sm-12">
-              <h3 className="page-title">Company Overview Dashboard</h3>
-              <p className="lead">Analytics & Statistics for S2T Users</p>
-            </div>
-          </div>
-        </div>
-        <div className="row">
-          {/* Pie Chart - Activity Domain Distribution */}
-          <div className="col-md-6">
-            <div className="card" ref={chartRefs.activityDomain}>
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Activity Domain Distribution</h5>
-                <button className="btn btn-sm btn-outline-primary" onClick={() => downloadChart(chartRefs.activityDomain, 'activity-domain-pie')}>Download</button>
-              </div>
-              <div className="card-body">
-                <Doughnut data={activityDomainData} />
-              </div>
-            </div>
-          </div>
-          {/* Donut Chart - Project Progress Stages */}
-          <div className="col-md-6">
-            <div className="card" ref={chartRefs.projectProgress}>
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Project Progress Stages</h5>
-                <button className="btn btn-sm btn-outline-primary" onClick={() => downloadChart(chartRefs.projectProgress, 'project-progress-donut')}>Download</button>
-              </div>
-              <div className="card-body">
-                <Doughnut data={projectProgressData} />
-              </div>
-            </div>
-          </div>
-          {/* Bar Chart - Staff Range Distribution */}
-          <div className="col-md-6">
-            <div className="card" ref={chartRefs.staffRange}>
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Staff Range Distribution</h5>
-                <button className="btn btn-sm btn-outline-primary" onClick={() => downloadChart(chartRefs.staffRange, 'staff-range-bar')}>Download</button>
-              </div>
-              <div className="card-body">
-                <Bar data={staffRangeData} />
-              </div>
-            </div>
-          </div>
-          {/* Horizontal Bar Chart - Support Needed Categories */}
-          <div className="col-md-6">
-            <div className="card" ref={chartRefs.supportNeeded}>
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Support Needed Categories</h5>
-                <button className="btn btn-sm btn-outline-primary" onClick={() => downloadChart(chartRefs.supportNeeded, 'support-needed-bar')}>Download</button>
-              </div>
-              <div className="card-body">
-                <Bar data={supportNeededData} options={{ indexAxis: 'y' }} />
-              </div>
-            </div>
-          </div>
-          {/* Gauge Chart - Approval Rate */}
-          <div className="col-md-6">
-            <div className="card" ref={chartRefs.approvalRate}>
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Approval Rate</h5>
-                <button className="btn btn-sm btn-outline-primary" onClick={() => downloadChart(chartRefs.approvalRate, 'approval-rate-gauge')}>Download</button>
-              </div>
-              <div className="card-body text-center">
-                <ReactApexChart
-                  options={{
-                    chart: { type: 'radialBar' },
-                    plotOptions: {
-                      radialBar: {
-                        hollow: { size: '70%' },
-                        dataLabels: {
-                          name: { show: false },
-                          value: { fontSize: '32px', show: true },
-                        },
-                      },
-                    },
-                    labels: ['Approval Rate'],
-                    colors: ['#66BB6A'],
-                  }}
-                  series={[approvalRate]}
-                  type="radialBar"
-                  height={300}
-                />
-                <div className="mt-2">{approvalRate}% Approved</div>
-              </div>
-            </div>
-          </div>
-          {/* Timeline Chart - Company Age */}
-          <div className="col-md-6">
-            <div className="card" ref={chartRefs.companyAge}>
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Company Age Timeline</h5>
-                <button className="btn btn-sm btn-outline-primary" onClick={() => downloadChart(chartRefs.companyAge, 'company-age-timeline')}>Download</button>
-              </div>
-              <div className="card-body">
-                <Bar data={timelineData} />
-              </div>
-            </div>
-          </div>
-          {/* Map Visualization - Company Locations */}
-          <div className="col-md-6">
-            <div className="card" ref={chartRefs.map}>
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Company Locations</h5>
-                <button className="btn btn-sm btn-outline-primary" onClick={() => downloadChart(chartRefs.map, 'company-locations-map')}>Download</button>
-              </div>
-              <div className="card-body">
-                {/* For demo: just show a list. For real map, integrate a map library. */}
-                <ul>
-                  {locations.map((loc, idx) => (
-                    <li key={idx}>{loc}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-          {/* Stacked Bar Chart - Domain vs Sub-Domain */}
-          <div className="col-md-12">
-            <div className="card" ref={chartRefs.stackedDomain}>
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Domain vs Sub-Domain</h5>
-                <button className="btn btn-sm btn-outline-primary" onClick={() => downloadChart(chartRefs.stackedDomain, 'domain-vs-subdomain-stacked')}>Download</button>
-              </div>
-              <div className="card-body">
-                <Bar data={stackedData} options={{ plugins: { legend: { position: 'top' } }, responsive: true, scales: { x: { stacked: true }, y: { stacked: true } } }} />
+            <div className="col-12">
+              <div className="card">
+                <div className="card-body text-center">
+                  <div className="spinner-border" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <p className="mt-3">Loading analytics data...</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <div className="footer d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
-        <p className="mb-0">2014 - 2025 © SmartHR.</p>
-        <p>
-          Designed &amp; Developed By <Link to="#" className="text-primary">Dreams</Link>
-        </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="page-wrapper cardhead">
+        <div className="content">
+          <div className="page-header">
+            <div className="row">
+              <div className="col-sm-12">
+                <h3 className="page-title">Company Overview Dashboard</h3>
+              </div>
+            </div>
+          </div>
+          <div className="row">
+            <div className="col-12">
+              <div className="card">
+                <div className="card-body text-center">
+                  <div className="alert alert-danger" role="alert">
+                    {error}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="page-wrapper cardhead">
+      <div className="content">
+        {/* Page Header */}
+        <div className="page-header">
+          <div className="row">
+            <div className="col-sm-12">
+              <h3 className="page-title">Company Overview Dashboard</h3>
+              <p className="text-muted">Analytics and insights for all companies</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="row mb-4">
+          <div className="col-md-3">
+            <div className="card bg-primary text-white">
+              <div className="card-body">
+                <div className="d-flex justify-content-between">
+                  <div>
+                    <h4 className="mb-0">{profiles.length}</h4>
+                    <p className="mb-0">Total Companies</p>
+                  </div>
+                  <div className="align-self-center">
+                    <i className="fas fa-building fa-2x"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-3">
+            <div className="card bg-success text-white">
+              <div className="card-body">
+                <div className="d-flex justify-content-between">
+                  <div>
+                    <h4 className="mb-0">{profiles.filter(p => p.requestStatus === 'APPROVED').length}</h4>
+                    <p className="mb-0">Approved</p>
+                  </div>
+                  <div className="align-self-center">
+                    <i className="fas fa-check-circle fa-2x"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-3">
+            <div className="card bg-warning text-white">
+              <div className="card-body">
+                <div className="d-flex justify-content-between">
+                  <div>
+                    <h4 className="mb-0">{profiles.filter(p => p.requestStatus === 'PENDING').length}</h4>
+                    <p className="mb-0">Pending</p>
+                  </div>
+                  <div className="align-self-center">
+                    <i className="fas fa-clock fa-2x"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-3">
+            <div className="card bg-danger text-white">
+              <div className="card-body">
+                <div className="d-flex justify-content-between">
+                  <div>
+                    <h4 className="mb-0">{profiles.filter(p => p.requestStatus === 'REJECTED').length}</h4>
+                    <p className="mb-0">Rejected</p>
+                  </div>
+                  <div className="align-self-center">
+                    <i className="fas fa-times-circle fa-2x"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Row 1 */}
+        <div className="row">
+          {/* Activity Domain Distribution - ChartJS Pie */}
+          <div className="col-md-6">
+            <div className="card" ref={chartRefs.activityDomain}>
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="card-title mb-0">Activity Domain Distribution</h5>
+                <button 
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => downloadChart(chartRefs.activityDomain, 'activity-domain-distribution')}
+                >
+                  <i className="fas fa-download"></i>
+                </button>
+              </div>
+              <div className="card-body">
+                <div style={{ height: '300px' }}>
+                  <Pie 
+                    data={activityDomainData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { position: 'bottom' },
+                        title: { display: true, text: 'Companies by Activity Domain' }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Project Progress - ChartJS Doughnut */}
+          <div className="col-md-6">
+            <div className="card" ref={chartRefs.projectProgress}>
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="card-title mb-0">Project Progress Status</h5>
+                <button 
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => downloadChart(chartRefs.projectProgress, 'project-progress-status')}
+                >
+                  <i className="fas fa-download"></i>
+                </button>
+              </div>
+              <div className="card-body">
+                <div style={{ height: '300px' }}>
+                  <Doughnut 
+                    data={projectProgressData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { position: 'bottom' },
+                        title: { display: true, text: 'Companies by Project Progress' }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Row 2 */}
+        <div className="row">
+          {/* Staff Range - ChartJS Bar */}
+          <div className="col-md-6">
+            <div className="card" ref={chartRefs.staffRange}>
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="card-title mb-0">Staff Range Distribution</h5>
+                <button 
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => downloadChart(chartRefs.staffRange, 'staff-range-distribution')}
+                >
+                  <i className="fas fa-download"></i>
+                </button>
+              </div>
+              <div className="card-body">
+                <div style={{ height: '300px' }}>
+                  <Bar 
+                    data={staffRangeData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'Companies by Staff Size' }
+                      },
+                      scales: {
+                        y: { beginAtZero: true }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Approval Rate - ApexCharts Radial */}
+          <div className="col-md-6">
+            <div className="card" ref={chartRefs.approvalRate}>
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="card-title mb-0">Approval Rate Overview</h5>
+                <button 
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => downloadChart(chartRefs.approvalRate, 'approval-rate-overview')}
+                >
+                  <i className="fas fa-download"></i>
+                </button>
+              </div>
+              <div className="card-body">
+                <ReactApexChart
+                  options={approvalRateData.options}
+                  series={approvalRateData.series}
+                  type="radialBar"
+                  height={300}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Row 3 */}
+        <div className="row">
+          {/* Revenue Trend - ApexCharts Line */}
+          <div className="col-md-6">
+            <div className="card" ref={chartRefs.revenueTrend}>
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="card-title mb-0">Revenue Growth Trend</h5>
+                <button 
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => downloadChart(chartRefs.revenueTrend, 'revenue-growth-trend')}
+                >
+                  <i className="fas fa-download"></i>
+                </button>
+              </div>
+              <div className="card-body">
+                <ReactApexChart
+                  options={revenueTrendData.options}
+                  series={revenueTrendData.series}
+                  type="line"
+                  height={300}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Stacked Domain - PrimeReact Bar */}
+          <div className="col-md-6">
+            <div className="card" ref={chartRefs.stackedDomain}>
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="card-title mb-0">Domain Status Stacked</h5>
+                <button 
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => downloadChart(chartRefs.stackedDomain, 'domain-status-stacked')}
+                >
+                  <i className="fas fa-download"></i>
+                </button>
+              </div>
+              <div className="card-body">
+                <PrimeChart 
+                  type="bar" 
+                  data={stackedDomainData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      title: { display: true, text: 'Companies by Domain and Status' }
+                    },
+                    scales: {
+                      x: { stacked: true },
+                      y: { stacked: true, beginAtZero: true }
+                    }
+                  }}
+                  style={{ height: '300px' }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Support Needed - PrimeReact Pie */}
+        <div className="row">
+          <div className="col-md-6">
+            <div className="card" ref={chartRefs.supportNeeded}>
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="card-title mb-0">Support Needs Distribution</h5>
+                <button 
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => downloadChart(chartRefs.supportNeeded, 'support-needs-distribution')}
+                >
+                  <i className="fas fa-download"></i>
+                </button>
+              </div>
+              <div className="card-body">
+                <PrimeChart 
+                  type="pie" 
+                  data={supportNeededData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: { position: 'bottom' },
+                      title: { display: true, text: 'Companies by Support Needs' }
+                    }
+                  }}
+                  style={{ height: '300px' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Companies List */}
+          <div className="col-md-6">
+            <div className="card">
+              <div className="card-header">
+                <h5 className="card-title mb-0">All Companies - Click to View Details</h5>
+              </div>
+              <div className="card-body">
+                <div className="table-responsive" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  <table className="table table-hover">
+                    <thead>
+                      <tr>
+                        <th>Company Name</th>
+                        <th>Domain</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {profiles.slice(0, 10).map((profile: any, index: number) => (
+                        <tr key={index}>
+                          <td>{profile.companyName || 'N/A'}</td>
+                          <td>{profile.activityDomain || 'N/A'}</td>
+                          <td>
+                            <span className={`badge bg-${
+                              profile.requestStatus === 'APPROVED' ? 'success' : 
+                              profile.requestStatus === 'REJECTED' ? 'danger' : 'warning'
+                            }`}>
+                              {profile.requestStatus || 'PENDING'}
+                            </span>
+                          </td>
+                          <td>
+                            <Link
+                              to={`/company-detail-dashboard/${profile._id}`}
+                              className="btn btn-sm btn-primary"
+                            >
+                              <i className="fas fa-eye me-1"></i>View
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {profiles.length > 10 && (
+                  <div className="text-center mt-3">
+                    <small className="text-muted">Showing first 10 of {profiles.length} companies</small>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

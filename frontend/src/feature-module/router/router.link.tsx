@@ -293,6 +293,7 @@ import TrainingList from "../training/trainingList";
 import Invoices from "../finance-accounts/sales/invoices";
 import { useAuth } from "../../contexts/AuthContext";
 import CompanyOverviewDashboard from '../uiInterface/charts/CompanyOverviewDashboard';
+import CompanyDetailDashboard from '../uiInterface/charts/CompanyDetailDashboard';
 
 function RootRedirect() {
   const { isAuthenticated, loading } = useAuth();
@@ -424,6 +425,11 @@ export const publicRoutes = [
   {
     path: routes.companyOverviewDashboard,
     element: <CompanyOverviewDashboard />,
+    route: Route,
+  },
+  {
+    path: routes.companyDetailDashboard,
+    element: <CompanyDetailDashboard />,
     route: Route,
   },
 

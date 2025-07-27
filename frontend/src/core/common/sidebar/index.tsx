@@ -1,37 +1,88 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Scrollbars from "react-custom-scrollbars-2";
 import ImageWithBasePath from "../imageWithBasePath";
 import "../../../style/icon/tabler-icons/webfont/tabler-icons.css";
 import { setExpandMenu } from "../../data/redux/sidebarSlice";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import {
   resetAllMode,
   setDataLayout,
 } from "../../data/redux/themeSettingSlice";
 import usePreviousRoute from "./usePreviousRoute";
 import { SidebarDataTest } from "../../data/json/sidebarMenu";
+import { searchCompanies } from "../../../services/searchService";
+import "../header/search.css";
 
 const Sidebar = () => {
   const Location = useLocation();
+  const [subOpen, setSubOpen] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
-  const [subOpen, setSubopen] = useState<any>("Dashboard");
-  const [subsidebar, setSubsidebar] = useState("");
+  // Handle search input changes
+  const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    
+    if (value.length >= 2) {
+      setIsSearching(true);
+      try {
+        const response = await searchCompanies(value);
+        if (response.success) {
+          setSearchResults(response.data);
+          setShowSearchResults(true);
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  };
+
+  // Handle search result click
+  const handleSearchResultClick = (companyId: string) => {
+    setShowSearchResults(false);
+    setSearchTerm("");
+    // Navigate to company detail page
+    window.location.href = `/company-detail-dashboard/${companyId}`;
+  };
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const toggleSidebar = (title: any) => {
-    localStorage.setItem("menuOpened", title);
-    if (title === subOpen) {
-      setSubopen("");
+    if (subOpen === title) {
+      setSubOpen("");
     } else {
-      setSubopen(title);
+      setSubOpen(title);
     }
   };
 
   const toggleSubsidebar = (subitem: any) => {
-    if (subitem === subsidebar) {
-      setSubsidebar("");
+    if (subitem === subOpen) {
+      setSubOpen("");
     } else {
-      setSubsidebar(subitem);
+      setSubOpen(subitem);
     }
   };
 
@@ -40,31 +91,38 @@ const Sidebar = () => {
   };
 
   const handleClick = (label: any, themeSetting: any, layout: any) => {
-    toggleSidebar(label);
     if (themeSetting) {
+      dispatch(setDataLayout(themeSetting));
+    }
+    if (layout) {
       handleLayoutChange(layout);
     }
   };
 
   const getLayoutClass = (label: any) => {
-    switch (label) {
-      case "Default":
-        return "default_layout";
-      case "Mini":
-        return "mini_layout";
-      case "Box":
-        return "boxed_layout";
-      case "Dark":
-        return "dark_data_theme";
-      case "RTL":
-        return "rtl";
-      default:
-        return "";
+    if (label === "Horizontal") {
+      return "horizontal-layout";
+    } else if (label === "Vertical") {
+      return "vertical-layout";
+    } else if (label === "Two Column") {
+      return "two-column-layout";
+    } else if (label === "Stacked") {
+      return "stacked-layout";
     }
+    return "";
   };
-  const location = useLocation();
+
   const dispatch = useDispatch();
-  const previousLocation = usePreviousRoute();
+  const dataLayout = useSelector((state: any) => state.themeSetting.dataLayout);
+  const mobileSidebar = useSelector((state: any) => state.sidebarSlice.mobileSidebar);
+
+  const onMouseEnter = () => {
+    document.body.classList.add("sidebar-hovered");
+  };
+
+  const onMouseLeave = () => {
+    document.body.classList.remove("sidebar-hovered");
+  };
 
   useEffect(() => {
     const layoutPages = [
@@ -76,18 +134,18 @@ const Sidebar = () => {
     ];
 
     const isCurrentLayoutPage = layoutPages.some((path) =>
-      location.pathname.includes(path)
+      Location.pathname.includes(path)
     );
     const isPreviousLayoutPage =
-      previousLocation &&
-      layoutPages.some((path) => previousLocation.pathname.includes(path));
+      Location.pathname &&
+      layoutPages.some((path) => Location.pathname.includes(path));
 
 
-  }, [location, previousLocation, dispatch]);
+  }, [Location.pathname]);
 
   useEffect(() => {
     const currentMenu = localStorage.getItem("menuOpened") || 'Dashboard'
-    setSubopen(currentMenu);
+    setSubOpen(currentMenu);
     // Select all 'submenu' elements
     const submenus = document.querySelectorAll(".submenu");
     // Loop through each 'submenu'
@@ -106,12 +164,6 @@ const Sidebar = () => {
     });
   }, [Location.pathname]);
 
-  const onMouseEnter = () => {
-    dispatch(setExpandMenu(true));
-  };
-  const onMouseLeave = () => {
-    dispatch(setExpandMenu(false));
-  };
   return (
     <>
       <div
@@ -176,14 +228,59 @@ const Sidebar = () => {
         <p className="fs-10">System Admin</p>
       </div>
     </div>
-    <div className="input-group input-group-flat d-inline-flex mb-4">
+    <div className="input-group input-group-flat d-inline-flex mb-4 position-relative" ref={searchRef}>
       <span className="input-icon-addon">
         <i className="ti ti-search"></i>
       </span>
-      <input type="text" className="form-control" placeholder="Search in HRMS" />
+      <input 
+        type="text" 
+        className="form-control" 
+        placeholder="Search companies by name or domain..." 
+        value={searchTerm}
+        onChange={handleSearchChange}
+        onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
+      />
       <span className="input-group-text">
         <kbd>CTRL + / </kbd>
       </span>
+      
+      {/* Search Results Dropdown */}
+      {showSearchResults && (
+        <div className="search-results-dropdown">
+          <div className="search-results-header">
+            <h6 className="mb-0">Search Results</h6>
+            {isSearching && <small className="text-muted">Searching...</small>}
+          </div>
+          <div className="search-results-body">
+            {searchResults.length > 0 ? (
+              searchResults.map((company, index) => (
+                <div 
+                  key={index} 
+                  className="search-result-item"
+                  onClick={() => handleSearchResultClick(company._id)}
+                >
+                  <div className="search-result-content">
+                    <div className="company-name">{company.companyName}</div>
+                    <div className="company-details">
+                      <span className="founder">{company.founderName}</span>
+                      <span className="domain">{company.activityDomain}</span>
+                      <span className={`status badge bg-${company.requestStatus === 'APPROVED' ? 'success' : company.requestStatus === 'REJECTED' ? 'danger' : 'warning'}`}>
+                        {company.requestStatus}
+                      </span>
+                    </div>
+                  </div>
+                  <i className="ti ti-arrow-right"></i>
+                </div>
+              ))
+            ) : (
+              <div className="no-results">
+                <i className="ti ti-search"></i>
+                <p>No companies found</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
     <div
       className="d-flex align-items-center justify-content-between menu-item mb-3"
@@ -302,7 +399,7 @@ const Sidebar = () => {
                                             ? "active"
                                             : ""
                                         } ${
-                                        subsidebar === item?.label ? "subdrop" : ""
+                                        subOpen === item?.label ? "subdrop" : ""
                                         }`}
                                         onClick={() => {
                                         toggleSubsidebar(item?.label);
@@ -317,7 +414,7 @@ const Sidebar = () => {
                                         <ul
                                         style={{
                                             display:
-                                            subsidebar === item?.label ? "block" : "none",
+                                            subOpen === item?.label ? "block" : "none",
                                         }}
                                         >
                                         {item?.submenuItems?.map((items: any, k: any) => (
@@ -325,7 +422,7 @@ const Sidebar = () => {
                                             <Link
                                                 to={items?.submenu ? "#" :items?.link}
                                                 className={`${
-                                                subsidebar === items?.label
+                                                subOpen === items?.label
                                                     ? "submenu-two subdrop"
                                                     : "submenu-two"
                                                 } ${

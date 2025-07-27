@@ -5,6 +5,7 @@ export const all_routes = {
   leadsDashboard: "/leads-dashboard",
   dealsDashboard: "/deals-dashboard",
   companyOverviewDashboard: "/company-overview-dashboard",
+  companyDetailDashboard: "/company-detail-dashboard/:companyId",
 
   //Application routes
   chat: "/application/chat",

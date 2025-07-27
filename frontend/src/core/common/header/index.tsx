@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -11,29 +11,83 @@ import {
 } from "../../data/redux/sidebarSlice";
 import { all_routes } from "../../../feature-module/router/all_routes";
 import { HorizontalSidebarData } from '../../data/json/horizontalSidebar'
+import { searchCompanies } from "../../../services/searchService";
+import "./search.css";
+
 const Header = () => {
+  const Location = useLocation();
   const routes = all_routes;
+  const [subOpen, setSubOpen] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Handle search input changes
+  const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    
+    if (value.length >= 2) {
+      setIsSearching(true);
+      try {
+        const response = await searchCompanies(value);
+        if (response.success) {
+          setSearchResults(response.data);
+          setShowSearchResults(true);
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  };
+
+  // Handle search result click
+  const handleSearchResultClick = (companyId: string) => {
+    setShowSearchResults(false);
+    setSearchTerm("");
+    // Navigate to company detail page
+    window.location.href = `/company-detail-dashboard/${companyId}`;
+  };
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const dispatch = useDispatch();
   const dataLayout = useSelector((state: any) => state.themeSetting.dataLayout);
-  const Location = useLocation();
-
-  const [subOpen, setSubopen] = useState<any>("");
-  const [subsidebar, setSubsidebar] = useState("");
 
   const toggleSidebar = (title: any) => {
 	localStorage.setItem("menuOpened", title);
 	if (title === subOpen) {
-	  setSubopen("");
+	  setSubOpen("");
 	} else {
-	  setSubopen(title);
+	  setSubOpen(title);
 	}
   };
 
   const toggleSubsidebar = (subitem: any) => {
-	if (subitem === subsidebar) {
-	  setSubsidebar("");
+	if (subitem === subOpen) {
+	  setSubOpen("");
 	} else {
-	  setSubsidebar(subitem);
+	  setSubOpen(subitem);
 	}
   };
   const mobileSidebar = useSelector(
@@ -106,14 +160,59 @@ const Header = () => {
 							<Link id="toggle_btn" to="#" onClick={handleToggleMiniSidebar} className="btn btn-menubar me-1">
 								<i className="ti ti-arrow-bar-to-left"></i>
 							</Link>
-							<div className="input-group input-group-flat d-inline-flex me-1">
+							<div className="input-group input-group-flat d-inline-flex me-1 position-relative" ref={searchRef}>
 								<span className="input-icon-addon">
 									<i className="ti ti-search"></i>
 								</span>
-								<input type="text" className="form-control" placeholder="Search in HRMS" />
+								<input 
+									type="text" 
+									className="form-control" 
+									placeholder="Search companies by name or domain..." 
+									value={searchTerm}
+									onChange={handleSearchChange}
+									onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
+								/>
 								<span className="input-group-text">
 									<kbd>CTRL + / </kbd>
 								</span>
+								
+								{/* Search Results Dropdown */}
+								{showSearchResults && (
+									<div className="search-results-dropdown">
+										<div className="search-results-header">
+											<h6 className="mb-0">Search Results</h6>
+											{isSearching && <small className="text-muted">Searching...</small>}
+										</div>
+										<div className="search-results-body">
+											{searchResults.length > 0 ? (
+												searchResults.map((company, index) => (
+													<div 
+														key={index} 
+														className="search-result-item"
+														onClick={() => handleSearchResultClick(company._id)}
+													>
+														<div className="search-result-content">
+															<div className="company-name">{company.companyName}</div>
+															<div className="company-details">
+																<span className="founder">{company.founderName}</span>
+																<span className="domain">{company.activityDomain}</span>
+																<span className={`status badge bg-${company.requestStatus === 'APPROVED' ? 'success' : company.requestStatus === 'REJECTED' ? 'danger' : 'warning'}`}>
+																	{company.requestStatus}
+																</span>
+															</div>
+														</div>
+														<i className="ti ti-arrow-right"></i>
+													</div>
+												))
+											) : (
+												<div className="no-results">
+													<i className="ti ti-search"></i>
+													<p>No companies found</p>
+												</div>
+											)}
+										</div>
+									</div>
+								)}
 							</div>
 							<div className="dropdown crm-dropdown">
 								<Link to="#" className="btn btn-menubar me-1" data-bs-toggle="dropdown">
@@ -213,14 +312,14 @@ const Header = () => {
 																.includes(Location.pathname) || subMenu?.route === Location.pathname
 																? "active"
 																: ""
-															} ${subsidebar === subMenu.menuValue ? "subdrop" : ""}`} onClick={() => toggleSubsidebar(subMenu.menuValue)}>
+															} ${subOpen === subMenu.menuValue ? "subdrop" : ""}`} onClick={() => toggleSubsidebar(subMenu.menuValue)}>
 															<span>{subMenu?.menuValue}</span>
 															{subMenu?.customSubmenuTwo && <span className="menu-arrow"></span>}
 														</Link>
 
 														{/* Check if `customSubmenuTwo` exists */}
 														{subMenu?.customSubmenuTwo && subMenu?.subMenusTwo && (
-															<ul style={{ display: subsidebar === subMenu.menuValue ? "block" : "none" }}>
+															<ul style={{ display: subOpen === subMenu.menuValue ? "block" : "none" }}>
 															{subMenu.subMenusTwo.map((subMenuTwo:any, k:number) => (
 																<li key={`submenu-two-${k}`}>
 																<Link className={subMenuTwo.route === Location.pathname?'active':''} to={subMenuTwo.route}>{subMenuTwo.menuValue}</Link>
