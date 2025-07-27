@@ -351,7 +351,7 @@ const CompanyProfileModal: React.FC<CompanyProfileModalProps> = ({ isOpen, onClo
               Company Profile
             </h4>
             <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
-          </div>
+        </div>
 
           <div className="modal-body p-0">
             {/* Navigation Tabs */}
@@ -410,81 +410,81 @@ const CompanyProfileModal: React.FC<CompanyProfileModalProps> = ({ isOpen, onClo
                   <div className="row">
                     <div className="col-12 mb-3">
                       <div className="form-check">
-                        <input
-                          type="checkbox"
+              <input
+                type="checkbox"
                           className="form-check-input"
-                          name="consentGiven"
-                          checked={formData.consentGiven}
-                          onChange={handleInputChange}
-                          required
-                        />
+                name="consentGiven"
+                checked={formData.consentGiven}
+                onChange={handleInputChange}
+                required
+              />
                         <label className="form-check-label">
                           I consent to data processing and agree to the terms and conditions
-                        </label>
+            </label>
                       </div>
                     </div>
-                  </div>
+          </div>
 
                   <div className="row">
                     <div className="col-md-6 mb-3">
                       <label className="form-label">Company Name *</label>
-                      <input
-                        type="text"
+            <input
+              type="text"
                         className="form-control"
-                        name="companyName"
-                        value={formData.companyName}
-                        onChange={handleInputChange}
-                        required
-                      />
-                    </div>
+              name="companyName"
+              value={formData.companyName}
+              onChange={handleInputChange}
+              required
+            />
+          </div>
                     <div className="col-md-6 mb-3">
                       <label className="form-label">Founder Name *</label>
-                      <input
-                        type="text"
+            <input
+              type="text"
                         className="form-control"
-                        name="founderName"
-                        value={formData.founderName}
-                        onChange={handleInputChange}
-                        required
-                      />
+              name="founderName"
+              value={formData.founderName}
+              onChange={handleInputChange}
+              required
+            />
                     </div>
-                  </div>
+          </div>
 
                   <div className="row">
                     <div className="col-md-6 mb-3">
                       <label className="form-label">Email *</label>
-                      <input
-                        type="email"
+            <input
+              type="email"
                         className="form-control"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        required
-                      />
-                    </div>
+              name="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              required
+            />
+          </div>
                     <div className="col-md-6 mb-3">
                       <label className="form-label">Phone</label>
-                      <input
-                        type="tel"
+            <input
+              type="tel"
                         className="form-control"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                      />
+              name="phone"
+              value={formData.phone}
+              onChange={handleInputChange}
+            />
                     </div>
-                  </div>
+          </div>
 
                   <div className="row">
                     <div className="col-md-6 mb-3">
                       <label className="form-label">Company Creation Date *</label>
-                      <input
-                        type="date"
+            <input
+              type="date"
                         className="form-control"
-                        name="companyCreationDate"
-                        value={formData.companyCreationDate}
-                        onChange={handleInputChange}
-                        required
-                      />
+              name="companyCreationDate"
+              value={formData.companyCreationDate}
+              onChange={handleInputChange}
+              required
+            />
                     </div>
                     <div className="col-md-6 mb-3">
                       <label className="form-label">Website</label>
@@ -497,20 +497,20 @@ const CompanyProfileModal: React.FC<CompanyProfileModalProps> = ({ isOpen, onClo
                         placeholder="https://example.com"
                       />
                     </div>
-                  </div>
+          </div>
 
                   <div className="row">
                     <div className="col-md-6 mb-3">
                       <label className="form-label">Activity Domain *</label>
-                      <select
+            <select
                         className="form-select"
-                        name="activityDomain"
-                        value={formData.activityDomain}
-                        onChange={handleInputChange}
-                        required
-                      >
+              name="activityDomain"
+              value={formData.activityDomain}
+              onChange={handleInputChange}
+              required
+            >
                         <option value="">Select Activity Domain</option>
-                        {enums?.ActivityDomain && Object.entries(enums.ActivityDomain).map(([key, value]) => (
+              {enums?.ActivityDomain && Object.entries(enums.ActivityDomain).map(([key, value]) => (
                           <option key={key} value={key}>{value}</option>
                         ))}
                       </select>
@@ -526,23 +526,23 @@ const CompanyProfileModal: React.FC<CompanyProfileModalProps> = ({ isOpen, onClo
                         <option value="">Select Activity Subdomain</option>
                         {enums?.ActivitySubDomain && Object.entries(enums.ActivitySubDomain).map(([key, value]) => (
                           <option key={key} value={key}>{value}</option>
-                        ))}
-                      </select>
+              ))}
+            </select>
                     </div>
-                  </div>
+          </div>
 
                   <div className="row">
                     <div className="col-md-6 mb-3">
                       <label className="form-label">Project Progress *</label>
-                      <select
+            <select
                         className="form-select"
-                        name="projectProgress"
-                        value={formData.projectProgress}
-                        onChange={handleInputChange}
-                        required
-                      >
+              name="projectProgress"
+              value={formData.projectProgress}
+              onChange={handleInputChange}
+              required
+            >
                         <option value="">Select Project Progress</option>
-                        {enums?.ProjectProgress && Object.entries(enums.ProjectProgress).map(([key, value]) => (
+              {enums?.ProjectProgress && Object.entries(enums.ProjectProgress).map(([key, value]) => (
                           <option key={key} value={key}>{value}</option>
                         ))}
                       </select>
@@ -558,37 +558,37 @@ const CompanyProfileModal: React.FC<CompanyProfileModalProps> = ({ isOpen, onClo
                         <option value="">Select Company Stage</option>
                         {enums?.CompanyStage && Object.entries(enums.CompanyStage).map(([key, value]) => (
                           <option key={key} value={key}>{value}</option>
-                        ))}
-                      </select>
+              ))}
+            </select>
                     </div>
-                  </div>
+          </div>
 
                   <div className="row">
                     <div className="col-md-6 mb-3">
                       <label className="form-label">Staff Range *</label>
-                      <select
+            <select
                         className="form-select"
-                        name="staffRange"
-                        value={formData.staffRange}
-                        onChange={handleInputChange}
-                        required
-                      >
+              name="staffRange"
+              value={formData.staffRange}
+              onChange={handleInputChange}
+              required
+            >
                         <option value="">Select Staff Range</option>
-                        {enums?.StaffRange && Object.entries(enums.StaffRange).map(([key, value]) => (
+              {enums?.StaffRange && Object.entries(enums.StaffRange).map(([key, value]) => (
                           <option key={key} value={key}>{value}</option>
-                        ))}
-                      </select>
-                    </div>
+              ))}
+            </select>
+          </div>
                     <div className="col-md-6 mb-3">
                       <label className="form-label">Address</label>
-                      <textarea
+            <textarea
                         className="form-control"
-                        name="address"
-                        value={formData.address}
-                        onChange={handleInputChange}
-                        rows={3}
-                      />
-                    </div>
+              name="address"
+              value={formData.address}
+              onChange={handleInputChange}
+              rows={3}
+            />
+          </div>
                   </div>
                 </div>
               )}
@@ -958,8 +958,8 @@ const CompanyProfileModal: React.FC<CompanyProfileModalProps> = ({ isOpen, onClo
                     onClick={onClose}
                     disabled={isSubmitting}
                   >
-                    Cancel
-                  </button>
+              Cancel
+            </button>
                 </div>
               </div>
             </form>

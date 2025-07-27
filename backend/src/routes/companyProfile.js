@@ -21,14 +21,8 @@ router.post('/:userId', authenticateToken, createOrUpdateCompanyProfile);
 
 // Analytics endpoint: returns all company profiles with only analytics fields
 router.get('/analytics', authenticateToken, async (req, res) => {
-  console.log('ANALYTICS DEBUG req.user:', req.user);
-  console.log('ANALYTICS DEBUG req.headers.authorization:', req.headers.authorization);
   try {
-    // Only allow S2T users
-    if (!req.user || req.user.role !== 'S2T') {
-      return res.status(403).json({ success: false, message: 'Access denied: S2T only' });
-    }
-    // Select only the fields needed for analytics
+    // No authentication or role check
     const profiles = await CompanyProfile.find({}, {
       activityDomain: 1,
       activitySubDomain: 1,
