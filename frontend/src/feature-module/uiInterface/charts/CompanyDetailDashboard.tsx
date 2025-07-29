@@ -30,27 +30,29 @@ const CompanyDetailDashboard = () => {
   const navigate = useNavigate();
   const { user, loading: userLoading } = useUser();
   const [companyProfile, setCompanyProfile] = useState<any>(null);
+  const [statistics, setStatistics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Chart refs for download
   const chartRefs = {
     companyOverview: useRef<HTMLDivElement>(null),
-    progressTimeline: useRef<HTMLDivElement>(null),
-    staffGrowth: useRef<HTMLDivElement>(null),
-    financialMetrics: useRef<HTMLDivElement>(null),
-    marketAnalysis: useRef<HTMLDivElement>(null),
-    riskAssessment: useRef<HTMLDivElement>(null),
-    revenueTrend: useRef<HTMLDivElement>(null),
-    performanceRadar: useRef<HTMLDivElement>(null),
+    genderDistribution: useRef<HTMLDivElement>(null),
+    sectorAnalysis: useRef<HTMLDivElement>(null),
+    certificationRate: useRef<HTMLDivElement>(null),
+    projectStageDistribution: useRef<HTMLDivElement>(null),
+    workforceAnalysis: useRef<HTMLDivElement>(null),
+    blockingFactors: useRef<HTMLDivElement>(null),
+    interventionsNeeded: useRef<HTMLDivElement>(null),
   };
 
   useEffect(() => {
     if (!userLoading && user && user.role === 'S2T') {
       fetchCompanyProfile();
+      fetchStatistics();
     }
     if (!userLoading && user && user.role !== 'S2T') {
-      setError('You are not authorized to view this page.');
+      setError('Vous n\'êtes pas autorisé à voir cette page.');
       setLoading(false);
     }
   }, [user, userLoading, companyId]);
@@ -70,13 +72,101 @@ const CompanyDetailDashboard = () => {
       if (data.success) {
         setCompanyProfile(data.data);
       } else {
-        setError(data.message || 'Failed to fetch company profile');
+        setError(data.message || 'Échec de la récupération du profil de l\'entreprise');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch company profile');
+      setError(err.message || 'Échec de la récupération du profil de l\'entreprise');
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchStatistics = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/company-profile/statistics`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStatistics(data.data);
+      }
+    } catch (err: any) {
+      console.error('Erreur lors de la récupération des statistiques:', err);
+    }
+  };
+
+  // Download PDF report from backend
+  const downloadPDFReport = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/company-profile/${companyId}/report`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${companyProfile?.companyName || 'entreprise'}-rapport-s2t.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        console.error('Erreur lors du téléchargement du rapport');
+      }
+    } catch (error) {
+      console.error('Erreur lors du téléchargement du rapport:', error);
+    }
+  };
+
+  // Download dashboard as PDF with charts/images (multi-page, normal size, clean report, optimized size)
+  const downloadDashboardPDF = async () => {
+    const doc = new jsPDF('p', 'mm', 'a4');
+    // Custom PDF header (not from DOM)
+    doc.setFontSize(18);
+    doc.text(`${companyProfile?.companyName || 'Entreprise'} - Rapport d'Analyse des Indicateurs S2T`, 15, 20);
+    doc.setFontSize(12);
+    doc.text(`Date: ${new Date().toLocaleDateString('fr-FR')}`, 15, 28);
+    let y = 38;
+
+    // Only include main dashboard sections (skip header/breadcrumb/export UI)
+    const sections = [
+      chartRefs.genderDistribution,
+      chartRefs.sectorAnalysis,
+      chartRefs.certificationRate,
+      chartRefs.projectStageDistribution,
+      chartRefs.workforceAnalysis,
+      chartRefs.blockingFactors,
+      chartRefs.interventionsNeeded,
+    ];
+
+    for (let i = 0; i < sections.length; i++) {
+      const ref = sections[i];
+      if (ref.current) {
+        const canvas = await html2canvas(ref.current, { scale: 1.2, useCORS: true });
+        const imgData = canvas.toDataURL('image/jpeg', 0.8); // Use JPEG, 80% quality
+        const pageWidth = 210;
+        const imgProps = doc.getImageProperties(imgData);
+        const pdfWidth = pageWidth - 20;
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+        if (y + pdfHeight > 287) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.addImage(imgData, 'JPEG', 10, y, pdfWidth, pdfHeight);
+        y += pdfHeight + 10;
+      }
+    }
+    doc.save(`${companyProfile?.companyName || 'entreprise'}-dashboard.pdf`);
   };
 
   // Helper: Download chart as image
@@ -89,233 +179,145 @@ const CompanyDetailDashboard = () => {
     }
   };
 
-  // Helper: Download entire page as PDF
-  const downloadAsPDF = async () => {
-    if (!chartRefs.companyOverview.current) return;
-    
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const canvas = await html2canvas(chartRefs.companyOverview.current, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true
-    });
-    
-    const imgData = canvas.toDataURL('image/png');
-    const imgWidth = 210;
-    const pageHeight = 295;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    let heightLeft = imgHeight;
-
-    let position = 0;
-
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-
-    while (heightLeft >= 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-    }
-    
-    pdf.save(`${companyProfile?.companyName || 'company'}-report.pdf`);
-  };
-
-  // Helper: Download entire page as image
-  const downloadAsImage = async () => {
-    if (!chartRefs.companyOverview.current) return;
-    
-    const canvas = await html2canvas(chartRefs.companyOverview.current, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true
-    });
-    
-    canvas.toBlob((blob: Blob | null) => {
-      if (blob) saveAs(blob, `${companyProfile?.companyName || 'company'}-dashboard.png`);
-    });
-  };
-
-  // Generate beautiful chart data
-  const generateChartData = () => {
-    if (!companyProfile) {
-      return {
-        progressData: {
-          labels: [],
-          datasets: []
-        },
-        staffData: {
-          labels: [],
-          datasets: []
-        },
-        financialData: {
-          labels: [],
-          datasets: []
-        },
-        marketData: {
-          labels: [],
-          datasets: []
-        },
-        riskData: {
-          labels: [],
-          datasets: []
-        }
-      };
-    }
-
-    // ChartJS Data
-    const progressData = {
-      labels: ['Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024'],
-      datasets: [
-        {
-          label: 'Development Progress',
-          data: [20, 35, 50, 75, 90],
-          borderColor: '#42A5F5',
-          backgroundColor: 'rgba(66, 165, 245, 0.1)',
-          tension: 0.4,
-          fill: true
-        }
-      ]
-    };
-
-    const staffData = {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-      datasets: [
-        {
-          label: 'Team Size',
-          data: [1, 2, 3, 5, 8, 12],
-          backgroundColor: '#66BB6A',
-          borderColor: '#66BB6A',
-          borderWidth: 2
-        }
-      ]
-    };
-
-    const financialData = {
-      labels: ['Revenue', 'Funding', 'Expenses', 'Profit'],
-      datasets: [
-        {
-          data: [companyProfile.revenue || 100000, companyProfile.funding || 50000, companyProfile.expenses || 80000, companyProfile.profit || 20000],
-          backgroundColor: ['#42A5F5', '#66BB6A', '#FF7043', '#FFEB3B'],
+  // Generate chart data for new indicators
+  const generateIndicatorCharts = () => {
+    if (!companyProfile) return {
+      genderData: {
+        labels: ['Homme', 'Femme', 'Autre'],
+        datasets: [{
+          data: [0, 0, 0],
+          backgroundColor: ['#42A5F5', '#FF7043', '#66BB6A'],
           borderWidth: 2,
           borderColor: '#fff'
-        }
-      ]
-    };
-
-    const marketData = {
-      labels: ['Market Share', 'Competition', 'Growth Rate', 'Customer Base'],
-      datasets: [
-        {
-          label: 'Market Metrics',
-          data: [15, 25, 40, 60],
+        }]
+      },
+      sectorData: {
+        labels: ['Technologie'],
+        datasets: [{
+          label: 'Répartition par Secteur',
+          data: [0],
           backgroundColor: '#AB47BC',
           borderColor: '#AB47BC',
           borderWidth: 2
-        }
-      ]
+        }]
+      },
+      certificationData: {
+        labels: ['Certifié', 'Non Certifié'],
+        datasets: [{
+          data: [0, 1],
+          backgroundColor: ['#66BB6A', '#FF7043'],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      projectStageData: {
+        labels: ['Idée', 'Prototype', 'Pilote', 'Entrée Marché', 'Mise à l\'Échelle'],
+        datasets: [{
+          label: 'Étape du Projet',
+          data: [0, 0, 0, 0, 0],
+          backgroundColor: '#42A5F5',
+          borderColor: '#42A5F5',
+          borderWidth: 2
+        }]
+      },
+      workforceData: {
+        labels: ['0-5', '5-10', '10-20', '20+'],
+        datasets: [{
+          label: 'Répartition de l\'Effectif',
+          data: [0, 0, 0, 0],
+          backgroundColor: '#FFEB3B',
+          borderColor: '#FFEB3B',
+          borderWidth: 2
+        }]
+      }
     };
 
-    const riskData = {
-      labels: ['Technical Risk', 'Market Risk', 'Financial Risk', 'Operational Risk'],
-      datasets: [
-        {
-          label: 'Risk Level',
-          data: [30, 45, 25, 35],
-          backgroundColor: '#FF7043',
-          borderColor: '#FF7043',
-          borderWidth: 2
-        }
-      ]
+    // Gender Distribution
+    const genderData = {
+      labels: ['Homme', 'Femme', 'Autre'],
+      datasets: [{
+        data: [
+          companyProfile.gender === 'MALE' ? 1 : 0,
+          companyProfile.gender === 'FEMALE' ? 1 : 0,
+          companyProfile.gender === 'OTHER' ? 1 : 0
+        ],
+        backgroundColor: ['#42A5F5', '#FF7043', '#66BB6A'],
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    };
+
+    // Sector Analysis
+    const sectorData = {
+      labels: companyProfile.sectors || ['Technologie'],
+      datasets: [{
+        label: 'Répartition par Secteur',
+        data: [1],
+        backgroundColor: '#AB47BC',
+        borderColor: '#AB47BC',
+        borderWidth: 2
+      }]
+    };
+
+    // Certification Rate
+    const certificationData = {
+      labels: ['Certifié', 'Non Certifié'],
+      datasets: [{
+        data: [
+          companyProfile.qualityCertification ? 1 : 0,
+          companyProfile.qualityCertification ? 0 : 1
+        ],
+        backgroundColor: ['#66BB6A', '#FF7043'],
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    };
+
+    // Project Stage Distribution
+    const projectStageData = {
+      labels: ['Idée', 'Prototype', 'Pilote', 'Entrée Marché', 'Mise à l\'Échelle'],
+      datasets: [{
+        label: 'Étape du Projet',
+        data: [
+          companyProfile.projectStage === 'IDEA' ? 1 : 0,
+          companyProfile.projectStage === 'PROTOTYPE' ? 1 : 0,
+          companyProfile.projectStage === 'PILOT' ? 1 : 0,
+          companyProfile.projectStage === 'MARKET_ENTRY' ? 1 : 0,
+          companyProfile.projectStage === 'SCALING' ? 1 : 0
+        ],
+        backgroundColor: '#42A5F5',
+        borderColor: '#42A5F5',
+        borderWidth: 2
+      }]
+    };
+
+    // Workforce Analysis
+    const workforceData = {
+      labels: ['0-5', '5-10', '10-20', '20+'],
+      datasets: [{
+        label: 'Répartition de l\'Effectif',
+        data: [
+          companyProfile.workforce <= 5 ? 1 : 0,
+          companyProfile.workforce > 5 && companyProfile.workforce <= 10 ? 1 : 0,
+          companyProfile.workforce > 10 && companyProfile.workforce <= 20 ? 1 : 0,
+          companyProfile.workforce > 20 ? 1 : 0
+        ],
+        backgroundColor: '#FFEB3B',
+        borderColor: '#FFEB3B',
+        borderWidth: 2
+      }]
     };
 
     return {
-      progressData,
-      staffData,
-      financialData,
-      marketData,
-      riskData
+      genderData,
+      sectorData,
+      certificationData,
+      projectStageData,
+      workforceData
     };
   };
 
-  // ApexCharts Data
-  const revenueTrendData = {
-    series: [{
-      name: 'Revenue',
-      data: [30, 40, 35, 50, 49, 60, 70, 91, 125, 150, 180, 200]
-    }, {
-      name: 'Expenses',
-      data: [20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75]
-    }],
-    options: {
-      chart: {
-        height: 350,
-        type: 'line' as const,
-        zoom: { enabled: false },
-        toolbar: { show: false }
-      },
-      dataLabels: { enabled: false },
-      stroke: { curve: 'smooth' as const, width: 3 },
-      grid: {
-        row: {
-          colors: ['#f3f3f3', 'transparent'],
-          opacity: 0.5
-        }
-      },
-      xaxis: {
-        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-      },
-      colors: ['#42A5F5', '#FF7043'],
-      legend: { position: 'top' as const }
-    }
-  };
-
-  const performanceRadarData = {
-    series: [{
-      name: 'Performance Metrics',
-      data: [80, 65, 90, 75, 85, 70]
-    }],
-    options: {
-      chart: {
-        height: 350,
-        type: 'radar' as const,
-        toolbar: { show: false }
-      },
-      stroke: { width: 2 },
-      fill: { opacity: 0.25 },
-      markers: { size: 0 },
-      xaxis: {
-        categories: ['Innovation', 'Market Position', 'Financial Health', 'Team Growth', 'Customer Satisfaction', 'Operational Efficiency']
-      },
-      colors: ['#42A5F5']
-    }
-  };
-
-  // PrimeReact Chart Data
-  const marketShareData = {
-    labels: ['Our Company', 'Competitor A', 'Competitor B', 'Competitor C', 'Others'],
-    datasets: [
-      {
-        data: [25, 30, 20, 15, 10],
-        backgroundColor: ['#42A5F5', '#66BB6A', '#FF7043', '#FFEB3B', '#AB47BC']
-      }
-    ]
-  };
-
-  const customerSatisfactionData = {
-    labels: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very Dissatisfied'],
-    datasets: [
-      {
-        label: 'Customer Satisfaction',
-        data: [45, 30, 15, 8, 2],
-        backgroundColor: '#66BB6A',
-        borderColor: '#66BB6A',
-        borderWidth: 2
-      }
-    ]
-  };
-
-  const chartData = generateChartData();
+  const chartData = generateIndicatorCharts();
 
   if (loading) {
     return (
@@ -324,7 +326,7 @@ const CompanyDetailDashboard = () => {
           <div className="page-header">
             <div className="row">
               <div className="col-sm-12">
-                <h3 className="page-title">Company Detail Dashboard</h3>
+                <h3 className="page-title">Détail du Profil de l'Entreprise</h3>
               </div>
             </div>
           </div>
@@ -333,9 +335,9 @@ const CompanyDetailDashboard = () => {
               <div className="card">
                 <div className="card-body text-center">
                   <div className="spinner-border" role="status">
-                    <span className="visually-hidden">Loading...</span>
+                    <span className="visually-hidden">Chargement...</span>
                   </div>
-                  <p className="mt-3">Loading company data...</p>
+                  <p className="mt-3">Chargement des données de l'entreprise...</p>
                 </div>
               </div>
             </div>
@@ -352,7 +354,7 @@ const CompanyDetailDashboard = () => {
           <div className="page-header">
             <div className="row">
               <div className="col-sm-12">
-                <h3 className="page-title">Company Detail Dashboard</h3>
+                <h3 className="page-title">Détail du Profil de l'Entreprise</h3>
               </div>
             </div>
           </div>
@@ -364,7 +366,7 @@ const CompanyDetailDashboard = () => {
                     {error}
                   </div>
                   <button className="btn btn-primary" onClick={() => navigate(-1)}>
-                    Go Back
+                    Retour
                   </button>
                 </div>
               </div>
@@ -379,27 +381,36 @@ const CompanyDetailDashboard = () => {
     <div className="page-wrapper cardhead" ref={chartRefs.companyOverview}>
       <div className="content">
         {/* Page Header */}
-        <div className="page-header">
-          <div className="row">
-            <div className="col-sm-12">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <h3 className="page-title">{companyProfile?.companyName || 'Company'} Dashboard</h3>
-                  <p className="text-muted">Detailed analytics and insights</p>
-                </div>
-                <div className="btn-group">
-                  <button className="btn btn-outline-primary" onClick={downloadAsPDF}>
-                    <i className="fas fa-file-pdf me-1"></i>Download PDF
-                  </button>
-                  <button className="btn btn-outline-primary" onClick={downloadAsImage}>
-                    <i className="fas fa-image me-1"></i>Download Image
-                  </button>
-                  <Link to="/company-overview-dashboard" className="btn btn-outline-secondary">
-                    <i className="fas fa-arrow-left me-1"></i>Back to Overview
-                  </Link>
-                </div>
+        <div className="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
+          <div className="my-auto mb-2">
+            <h2 className="mb-1">{companyProfile?.companyName || 'Entreprise'} - Tableau de Bord</h2>
+            <nav>
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link to="/index"><i className="ti ti-smart-home"></i></Link></li>
+                <li className="breadcrumb-item">CRM</li>
+                <li className="breadcrumb-item active" aria-current="page">Détail Entreprise</li>
+              </ol>
+            </nav>
+          </div>
+          <div className="d-flex my-xl-auto right-content align-items-center flex-wrap ">
+            <div className="me-2 mb-2">
+              <div className="d-flex align-items-center border bg-white rounded p-1 me-2 icon-list">
+                <Link className="btn btn-icon btn-sm me-1" to="/company-overview-dashboard"><i className="ti ti-list-tree"></i></Link>
+                <a className="btn btn-icon btn-sm active bg-primary text-white" href="#"><i className="ti ti-layout-grid"></i></a>
               </div>
             </div>
+            <div className="me-2 mb-2">
+              <div className="dropdown">
+                <a className="dropdown-toggle btn btn-white d-inline-flex align-items-center" data-bs-toggle="dropdown" href="#" aria-expanded="false">
+                  <i className="ti ti-file-export me-1"></i>Export
+                </a>
+                <ul className="dropdown-menu dropdown-menu-end p-3">
+                  <li><a className="dropdown-item rounded-1" href="#" onClick={downloadPDFReport}><i className="ti ti-file-type-pdf me-1"></i>Export as PDF</a></li>
+                  <li><a className="dropdown-item rounded-1" href="#" onClick={downloadDashboardPDF}><i className="ti ti-file-type-xls me-1"></i>Export as Image PDF</a></li>
+                </ul>
+              </div>
+            </div>
+            {/* Add Deal button and collapse header can be omitted or customized as needed */}
           </div>
         </div>
 
@@ -410,8 +421,8 @@ const CompanyDetailDashboard = () => {
               <div className="card-body">
                 <div className="d-flex justify-content-between">
                   <div>
-                    <h4 className="mb-0">{companyProfile?.activityDomain || 'N/A'}</h4>
-                    <p className="mb-0">Activity Domain</p>
+                    <h4 className="mb-0">{companyProfile?.activityDomain || 'Non spécifié'}</h4>
+                    <p className="mb-0">Domaine d'Activité</p>
                   </div>
                   <div className="align-self-center">
                     <i className="fas fa-industry fa-2x"></i>
@@ -425,8 +436,8 @@ const CompanyDetailDashboard = () => {
               <div className="card-body">
                 <div className="d-flex justify-content-between">
                   <div>
-                    <h4 className="mb-0">{companyProfile?.projectProgress || 'N/A'}</h4>
-                    <p className="mb-0">Project Progress</p>
+                    <h4 className="mb-0">{companyProfile?.projectProgress || 'Non spécifié'}</h4>
+                    <p className="mb-0">Avancement du Projet</p>
                   </div>
                   <div className="align-self-center">
                     <i className="fas fa-chart-line fa-2x"></i>
@@ -440,8 +451,8 @@ const CompanyDetailDashboard = () => {
               <div className="card-body">
                 <div className="d-flex justify-content-between">
                   <div>
-                    <h4 className="mb-0">{companyProfile?.staffRange || 'N/A'}</h4>
-                    <p className="mb-0">Team Size</p>
+                    <h4 className="mb-0">{companyProfile?.staffRange || 'Non spécifié'}</h4>
+                    <p className="mb-0">Effectif</p>
                   </div>
                   <div className="align-self-center">
                     <i className="fas fa-users fa-2x"></i>
@@ -455,8 +466,8 @@ const CompanyDetailDashboard = () => {
               <div className="card-body">
                 <div className="d-flex justify-content-between">
                   <div>
-                    <h4 className="mb-0">{companyProfile?.requestStatus || 'PENDING'}</h4>
-                    <p className="mb-0">Status</p>
+                    <h4 className="mb-0">{companyProfile?.requestStatus || 'EN ATTENTE'}</h4>
+                    <p className="mb-0">Statut</p>
                   </div>
                   <div className="align-self-center">
                     <i className="fas fa-flag fa-2x"></i>
@@ -467,49 +478,59 @@ const CompanyDetailDashboard = () => {
           </div>
         </div>
 
-        {/* Charts Row 1 */}
+        {/* New Indicators Charts Row 1 */}
         <div className="row">
-          {/* Progress Timeline - ChartJS Line */}
+          {/* Gender Distribution */}
           <div className="col-md-6">
-            <div className="card" ref={chartRefs.progressTimeline}>
+            <div className="card" ref={chartRefs.genderDistribution}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Progress Timeline</h5>
+                <h5 className="card-title mb-0">Répartition par Genre</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.progressTimeline, 'progress-timeline')}
+                  onClick={() => downloadChart(chartRefs.genderDistribution, 'repartition-genre')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
               </div>
               <div className="card-body">
                 <div style={{ height: '300px' }}>
-                  <Line 
-                    data={chartData.progressData}
+                  <Pie 
+                    data={chartData.genderData}
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
                       plugins: {
-                        legend: { position: 'top' },
-                        title: { display: true, text: 'Development Progress Over Time' }
-                      },
-                      scales: {
-                        y: { beginAtZero: true, max: 100 }
+                        legend: { position: 'bottom' },
+                        title: { display: true, text: 'Répartition des Fondateurs par Genre' }
                       }
                     }}
                   />
+                </div>
+                <div className="mt-3">
+                  <h6>Analyse:</h6>
+                  <p className="text-muted">
+                    La répartition par genre révèle les modèles de participation à l'entrepreneuriat dans notre incubateur. 
+                    Cette analyse aide à identifier les opportunités d'intervention ciblée pour améliorer la diversité.
+                  </p>
+                  <h6>Recommandations:</h6>
+                  <ul className="text-muted">
+                    <li>Développer des programmes d'entrepreneuriat axés sur les femmes si un déséquilibre existe</li>
+                    <li>Créer des réseaux de mentorat connectant les entrepreneures</li>
+                    <li>Organiser des ateliers sectoriels pour encourager la participation inter-genre</li>
+                  </ul>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Staff Growth - ChartJS Bar */}
+          {/* Sector Analysis */}
           <div className="col-md-6">
-            <div className="card" ref={chartRefs.staffGrowth}>
+            <div className="card" ref={chartRefs.sectorAnalysis}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Team Growth</h5>
+                <h5 className="card-title mb-0">Analyse Sectorielle</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.staffGrowth, 'team-growth')}
+                  onClick={() => downloadChart(chartRefs.sectorAnalysis, 'analyse-sectorielle')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
@@ -517,13 +538,13 @@ const CompanyDetailDashboard = () => {
               <div className="card-body">
                 <div style={{ height: '300px' }}>
                   <Bar 
-                    data={chartData.staffData}
+                    data={chartData.sectorData}
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
                       plugins: {
                         legend: { position: 'top' },
-                        title: { display: true, text: 'Team Size Growth' }
+                        title: { display: true, text: 'Répartition des Projets par Secteur' }
                       },
                       scales: {
                         y: { beginAtZero: true }
@@ -531,21 +552,34 @@ const CompanyDetailDashboard = () => {
                     }}
                   />
                 </div>
+                <div className="mt-3">
+                  <h6>Analyse:</h6>
+                  <p className="text-muted">
+                    La répartition sectorielle révèle nos domaines de concentration actuels et l'alignement du marché. 
+                    Les projets technologiques dominent généralement, reflétant les tendances d'innovation mondiales.
+                  </p>
+                  <h6>Recommandations:</h6>
+                  <ul className="text-muted">
+                    <li>Diversifier le portefeuille sectoriel pour réduire la concentration des risques</li>
+                    <li>Développer une expertise et des programmes de support sectoriels</li>
+                    <li>Identifier les secteurs émergents avec un potentiel de croissance élevé</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Charts Row 2 */}
+        {/* New Indicators Charts Row 2 */}
         <div className="row">
-          {/* Financial Metrics - ChartJS Doughnut */}
+          {/* Quality Certification */}
           <div className="col-md-6">
-            <div className="card" ref={chartRefs.financialMetrics}>
+            <div className="card" ref={chartRefs.certificationRate}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Financial Overview</h5>
+                <h5 className="card-title mb-0">Taux de Certification Qualité</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.financialMetrics, 'financial-overview')}
+                  onClick={() => downloadChart(chartRefs.certificationRate, 'taux-certification')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
@@ -553,29 +587,42 @@ const CompanyDetailDashboard = () => {
               <div className="card-body">
                 <div style={{ height: '300px' }}>
                   <Doughnut 
-                    data={chartData.financialData}
+                    data={chartData.certificationData}
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
                       plugins: {
                         legend: { position: 'bottom' },
-                        title: { display: true, text: 'Financial Distribution' }
+                        title: { display: true, text: 'Répartition des Projets Certifiés vs Non Certifiés' }
                       }
                     }}
                   />
+                </div>
+                <div className="mt-3">
+                  <h6>Analyse:</h6>
+                  <p className="text-muted">
+                    Les taux de certification qualité indiquent la maturité et la préparation au marché de nos projets incubés. 
+                    Les projets certifiés démontrent généralement une crédibilité et un potentiel d'accès au marché plus élevés.
+                  </p>
+                  <h6>Recommandations:</h6>
+                  <ul className="text-muted">
+                    <li>Implémenter des ateliers de préparation à la certification</li>
+                    <li>Développer des partenariats avec les organismes de certification</li>
+                    <li>Créer des cadres d'évaluation qualité internes</li>
+                  </ul>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Market Analysis - ChartJS Bar */}
+          {/* Project Stage Distribution */}
           <div className="col-md-6">
-            <div className="card" ref={chartRefs.marketAnalysis}>
+            <div className="card" ref={chartRefs.projectStageDistribution}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Market Analysis</h5>
+                <h5 className="card-title mb-0">Répartition par Étape de Projet</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.marketAnalysis, 'market-analysis')}
+                  onClick={() => downloadChart(chartRefs.projectStageDistribution, 'repartition-etapes')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
@@ -583,13 +630,13 @@ const CompanyDetailDashboard = () => {
               <div className="card-body">
                 <div style={{ height: '300px' }}>
                   <Bar 
-                    data={chartData.marketData}
+                    data={chartData.projectStageData}
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
                       plugins: {
                         legend: { position: 'top' },
-                        title: { display: true, text: 'Market Performance Metrics' }
+                        title: { display: true, text: 'Répartition des Projets par Étape de Développement' }
                       },
                       scales: {
                         y: { beginAtZero: true }
@@ -597,70 +644,34 @@ const CompanyDetailDashboard = () => {
                     }}
                   />
                 </div>
+                <div className="mt-3">
+                  <h6>Analyse:</h6>
+                  <p className="text-muted">
+                    La répartition par étape de projet révèle la santé de notre pipeline et l'efficacité du support 
+                    à différentes phases de développement. Une répartition équilibrée indique un flux de projets sain.
+                  </p>
+                  <h6>Recommandations:</h6>
+                  <ul className="text-muted">
+                    <li>Développer des programmes de support spécifiques à chaque étape</li>
+                    <li>Créer des critères de progression clairs</li>
+                    <li>Implémenter un jumelage de mentorat approprié à chaque phase</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Charts Row 3 */}
+        {/* New Indicators Charts Row 3 */}
         <div className="row">
-          {/* Revenue Trend - ApexCharts Line */}
+          {/* Workforce Analysis */}
           <div className="col-md-6">
-            <div className="card" ref={chartRefs.revenueTrend}>
+            <div className="card" ref={chartRefs.workforceAnalysis}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Revenue vs Expenses Trend</h5>
+                <h5 className="card-title mb-0">Analyse de l'Effectif</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.revenueTrend, 'revenue-expenses-trend')}
-                >
-                  <i className="fas fa-download"></i>
-                </button>
-              </div>
-              <div className="card-body">
-                <ReactApexChart
-                  options={revenueTrendData.options}
-                  series={revenueTrendData.series}
-                  type="line"
-                  height={300}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Performance Radar - ApexCharts Radar */}
-          <div className="col-md-6">
-            <div className="card" ref={chartRefs.performanceRadar}>
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Performance Radar</h5>
-                <button 
-                  className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.performanceRadar, 'performance-radar')}
-                >
-                  <i className="fas fa-download"></i>
-                </button>
-              </div>
-              <div className="card-body">
-                <ReactApexChart
-                  options={performanceRadarData.options}
-                  series={performanceRadarData.series}
-                  type="radar"
-                  height={300}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Charts Row 4 */}
-        <div className="row">
-          {/* Risk Assessment - ChartJS Bar */}
-          <div className="col-md-6">
-            <div className="card" ref={chartRefs.riskAssessment}>
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Risk Assessment</h5>
-                <button 
-                  className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.riskAssessment, 'risk-assessment')}
+                  onClick={() => downloadChart(chartRefs.workforceAnalysis, 'analyse-effectif')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
@@ -668,79 +679,163 @@ const CompanyDetailDashboard = () => {
               <div className="card-body">
                 <div style={{ height: '300px' }}>
                   <Bar 
-                    data={chartData.riskData}
+                    data={chartData.workforceData}
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
                       plugins: {
                         legend: { position: 'top' },
-                        title: { display: true, text: 'Risk Level Analysis' }
+                        title: { display: true, text: 'Répartition de l\'Effectif par Taille d\'Équipe' }
                       },
                       scales: {
-                        y: { beginAtZero: true, max: 100 }
+                        y: { beginAtZero: true }
                       }
                     }}
                   />
+                </div>
+                <div className="mt-3">
+                  <h6>Analyse:</h6>
+                  <p className="text-muted">
+                    Les métriques de l'effectif indiquent l'impact de création d'emplois et le succès de mise à l'échelle des projets. 
+                    La plupart des projets incubés commencent petits mais les modèles de croissance révèlent un potentiel de mise à l'échelle.
+                  </p>
+                  <h6>Recommandations:</h6>
+                  <ul className="text-muted">
+                    <li>Fournir un support au développement RH pour les projets en croissance</li>
+                    <li>Créer des programmes d'assistance au recrutement</li>
+                    <li>Développer des conseils en planification de l'effectif</li>
+                  </ul>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Market Share - PrimeReact Pie */}
+          {/* Blocking Factors */}
           <div className="col-md-6">
-            <div className="card">
+            <div className="card" ref={chartRefs.blockingFactors}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Market Share</h5>
-                <button className="btn btn-sm btn-outline-primary">
+                <h5 className="card-title mb-0">Facteurs de Blocage</h5>
+                <button 
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => downloadChart(chartRefs.blockingFactors, 'facteurs-blocage')}
+                >
                   <i className="fas fa-download"></i>
                 </button>
               </div>
               <div className="card-body">
-                <PrimeChart 
-                  type="pie" 
-                  data={marketShareData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: { position: 'bottom' },
-                      title: { display: true, text: 'Market Share Distribution' }
-                    }
-                  }}
-                  style={{ height: '300px' }}
-                />
+                <div className="table-responsive">
+                  <table className="table table-striped">
+                    <thead>
+                      <tr>
+                        <th>Facteur de Blocage</th>
+                        <th>Description</th>
+                        <th>Impact</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Accès au Financement</td>
+                        <td>Capital limité pour les phases de croissance</td>
+                        <td><span className="badge bg-danger">Élevé</span></td>
+                      </tr>
+                      <tr>
+                        <td>Conformité Réglementaire</td>
+                        <td>Processus complexes de licences et permis</td>
+                        <td><span className="badge bg-warning">Moyen</span></td>
+                      </tr>
+                      <tr>
+                        <td>Accès au Marché</td>
+                        <td>Difficulté à atteindre les clients cibles</td>
+                        <td><span className="badge bg-warning">Moyen</span></td>
+                      </tr>
+                      <tr>
+                        <td>Expertise Technique</td>
+                        <td>Lacunes de compétences dans des domaines spécialisés</td>
+                        <td><span className="badge bg-info">Faible</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3">
+                  <h6>Recommandations:</h6>
+                  <ul className="text-muted">
+                    <li>Établir des connexions avec le réseau d'investisseurs</li>
+                    <li>Fournir des conseils en conformité réglementaire</li>
+                    <li>Développer des programmes de facilitation d'accès au marché</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Customer Satisfaction - PrimeReact Bar */}
+        {/* Interventions Needed */}
         <div className="row">
           <div className="col-md-12">
-            <div className="card">
+            <div className="card" ref={chartRefs.interventionsNeeded}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Customer Satisfaction</h5>
-                <button className="btn btn-sm btn-outline-primary">
+                <h5 className="card-title mb-0">Interventions Requises</h5>
+                <button 
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => downloadChart(chartRefs.interventionsNeeded, 'interventions-requises')}
+                >
                   <i className="fas fa-download"></i>
                 </button>
               </div>
               <div className="card-body">
-                <PrimeChart 
-                  type="bar" 
-                  data={customerSatisfactionData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: { position: 'top' },
-                      title: { display: true, text: 'Customer Satisfaction Levels' }
-                    },
-                    scales: {
-                      y: { beginAtZero: true, max: 100 }
-                    }
-                  }}
-                  style={{ height: '300px' }}
-                />
+                <div className="table-responsive">
+                  <table className="table table-striped">
+                    <thead>
+                      <tr>
+                        <th>Type d'Intervention</th>
+                        <th>Description</th>
+                        <th>Priorité</th>
+                        <th>Statut</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Consultation Stratégie d'Affaires</td>
+                        <td>Conseils en stratégie et planification</td>
+                        <td><span className="badge bg-danger">Haute</span></td>
+                        <td><span className="badge bg-warning">En cours</span></td>
+                      </tr>
+                      <tr>
+                        <td>Formation Compétences Techniques</td>
+                        <td>Formation en compétences spécialisées</td>
+                        <td><span className="badge bg-warning">Moyenne</span></td>
+                        <td><span className="badge bg-success">Terminé</span></td>
+                      </tr>
+                      <tr>
+                        <td>Assistance Planification Financière</td>
+                        <td>Conseils en gestion financière</td>
+                        <td><span className="badge bg-danger">Haute</span></td>
+                        <td><span className="badge bg-info">Planifié</span></td>
+                      </tr>
+                      <tr>
+                        <td>Support Recherche Marché</td>
+                        <td>Études de marché et analyses</td>
+                        <td><span className="badge bg-warning">Moyenne</span></td>
+                        <td><span className="badge bg-warning">En cours</span></td>
+                      </tr>
+                      <tr>
+                        <td>Facilitation Réseautage</td>
+                        <td>Connexions avec partenaires et clients</td>
+                        <td><span className="badge bg-info">Faible</span></td>
+                        <td><span className="badge bg-success">Terminé</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3">
+                  <h6>Recommandations:</h6>
+                  <ul className="text-muted">
+                    <li>Élargir les capacités de consultation internes</li>
+                    <li>Développer des curricula de formation complets</li>
+                    <li>Renforcer les réseaux d'experts externes</li>
+                    <li>Créer des systèmes de support entre pairs</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -751,7 +846,7 @@ const CompanyDetailDashboard = () => {
           <div className="col-md-12">
             <div className="card">
               <div className="card-header">
-                <h5 className="card-title mb-0">Company Information</h5>
+                <h5 className="card-title mb-0">Informations Détaillées de l'Entreprise</h5>
               </div>
               <div className="card-body">
                 <div className="row">
@@ -759,24 +854,42 @@ const CompanyDetailDashboard = () => {
                     <table className="table table-borderless">
                       <tbody>
                         <tr>
-                          <td><strong>Company Name:</strong></td>
-                          <td>{companyProfile?.companyName || 'N/A'}</td>
+                          <td><strong>Nom de l'Entreprise:</strong></td>
+                          <td>{companyProfile?.companyName || 'Non spécifié'}</td>
                         </tr>
                         <tr>
-                          <td><strong>Founder:</strong></td>
-                          <td>{companyProfile?.founderName || 'N/A'}</td>
+                          <td><strong>Fondateur:</strong></td>
+                          <td>{companyProfile?.founderName || 'Non spécifié'}</td>
                         </tr>
                         <tr>
                           <td><strong>Email:</strong></td>
-                          <td>{companyProfile?.email || 'N/A'}</td>
+                          <td>{companyProfile?.email || 'Non spécifié'}</td>
                         </tr>
                         <tr>
-                          <td><strong>Activity Domain:</strong></td>
-                          <td>{companyProfile?.activityDomain || 'N/A'}</td>
+                          <td><strong>Domaine d'Activité:</strong></td>
+                          <td>{companyProfile?.activityDomain || 'Non spécifié'}</td>
                         </tr>
                         <tr>
-                          <td><strong>Sub Domain:</strong></td>
-                          <td>{companyProfile?.activitySubDomain || 'N/A'}</td>
+                          <td><strong>Sous-Domaine:</strong></td>
+                          <td>{companyProfile?.activitySubDomain || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                          <td><strong>Genre du Fondateur:</strong></td>
+                          <td>
+                            {companyProfile?.gender === 'MALE' ? 'Homme' : 
+                             companyProfile?.gender === 'FEMALE' ? 'Femme' : 
+                             companyProfile?.gender === 'OTHER' ? 'Autre' : 'Non spécifié'}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><strong>Étape du Projet:</strong></td>
+                          <td>
+                            {companyProfile?.projectStage === 'IDEA' ? 'Idée' :
+                             companyProfile?.projectStage === 'PROTOTYPE' ? 'Prototype' :
+                             companyProfile?.projectStage === 'PILOT' ? 'Pilote' :
+                             companyProfile?.projectStage === 'MARKET_ENTRY' ? 'Entrée Marché' :
+                             companyProfile?.projectStage === 'SCALING' ? 'Mise à l\'Échelle' : 'Non spécifié'}
+                          </td>
                         </tr>
                       </tbody>
                     </table>
@@ -785,31 +898,40 @@ const CompanyDetailDashboard = () => {
                     <table className="table table-borderless">
                       <tbody>
                         <tr>
-                          <td><strong>Project Progress:</strong></td>
-                          <td>{companyProfile?.projectProgress || 'N/A'}</td>
+                          <td><strong>Avancement du Projet:</strong></td>
+                          <td>{companyProfile?.projectProgress || 'Non spécifié'}</td>
                         </tr>
                         <tr>
-                          <td><strong>Staff Range:</strong></td>
-                          <td>{companyProfile?.staffRange || 'N/A'}</td>
+                          <td><strong>Effectif:</strong></td>
+                          <td>{companyProfile?.workforce || 'Non spécifié'} employés</td>
                         </tr>
                         <tr>
-                          <td><strong>Support Needed:</strong></td>
-                          <td>{companyProfile?.supportNeeded || 'N/A'}</td>
+                          <td><strong>Certification Qualité:</strong></td>
+                          <td>
+                            {companyProfile?.qualityCertification ? 
+                              <span className="badge bg-success">Certifié</span> : 
+                              <span className="badge bg-warning">Non Certifié</span>
+                            }
+                          </td>
                         </tr>
                         <tr>
-                          <td><strong>Status:</strong></td>
+                          <td><strong>Détails Certification:</strong></td>
+                          <td>{companyProfile?.certificationDetails || 'Non spécifié'}</td>
+                        </tr>
+                        <tr>
+                          <td><strong>Statut:</strong></td>
                           <td>
                             <span className={`badge bg-${
                               companyProfile?.requestStatus === 'APPROVED' ? 'success' : 
                               companyProfile?.requestStatus === 'REJECTED' ? 'danger' : 'warning'
                             }`}>
-                              {companyProfile?.requestStatus || 'PENDING'}
+                              {companyProfile?.requestStatus || 'EN ATTENTE'}
                             </span>
                           </td>
                         </tr>
                         <tr>
-                          <td><strong>Address:</strong></td>
-                          <td>{companyProfile?.address || 'N/A'}</td>
+                          <td><strong>Adresse:</strong></td>
+                          <td>{companyProfile?.address || 'Non spécifié'}</td>
                         </tr>
                       </tbody>
                     </table>

@@ -1,5 +1,6 @@
 const { CompanyProfile, ActivityDomain, ActivitySubDomain, ProjectProgress, StaffRange, RequestStatus, CompanyStage, LabelType, SupportNeeded } = require('../models/CompanyProfile');
 const { User } = require('../models/User');
+const PDFDocument = require('pdfkit');
 
 // Get company profile by user ID
 const getCompanyProfile = async (req, res) => {
@@ -29,59 +30,36 @@ const createOrUpdateCompanyProfile = async (req, res) => {
   try {
     const { userId } = req.params;
     const profileData = req.body;
-    
     // Security check: ensure authenticated user can only update their own profile
     if (req.user.userId.toString() !== userId) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
-    
-    // Validate required fields
-    const requiredFields = ['consentGiven', 'companyName', 'founderName', 'email', 'companyCreationDate', 'activityDomain', 'projectProgress', 'staffRange'];
+    // Validate required fields (add new indicators)
+    const requiredFields = [
+      'consentGiven', 'companyName', 'founderName', 'email', 'companyCreationDate',
+      'activityDomain', 'projectProgress', 'staffRange',
+      'gender', 'projectStage'
+    ];
     for (const field of requiredFields) {
       if (!profileData[field]) {
         return res.status(400).json({ success: false, message: `${field} is required` });
       }
     }
-    
-    // Validate enum values
-    if (!Object.values(ActivityDomain).includes(profileData.activityDomain)) {
-      return res.status(400).json({ success: false, message: 'Invalid activity domain' });
+    // Validate enums for new indicators
+    if (!['MALE', 'FEMALE', 'OTHER'].includes(profileData.gender)) {
+      return res.status(400).json({ success: false, message: 'Invalid gender' });
     }
-    
-    if (profileData.activitySubDomain && !Object.values(ActivitySubDomain).includes(profileData.activitySubDomain)) {
-      return res.status(400).json({ success: false, message: 'Invalid activity subdomain' });
+    if (!['IDEA', 'PROTOTYPE', 'PILOT', 'MARKET_ENTRY', 'SCALING'].includes(profileData.projectStage)) {
+      return res.status(400).json({ success: false, message: 'Invalid project stage' });
     }
-    
-    if (!Object.values(ProjectProgress).includes(profileData.projectProgress)) {
-      return res.status(400).json({ success: false, message: 'Invalid project progress' });
-    }
-    
-    if (!Object.values(StaffRange).includes(profileData.staffRange)) {
-      return res.status(400).json({ success: false, message: 'Invalid staff range' });
-    }
-    
-    if (profileData.stage && !Object.values(CompanyStage).includes(profileData.stage)) {
-      return res.status(400).json({ success: false, message: 'Invalid company stage' });
-    }
-    
-    if (profileData.labelType && !Object.values(LabelType).includes(profileData.labelType)) {
-      return res.status(400).json({ success: false, message: 'Invalid label type' });
-    }
-    
-    if (profileData.requestStatus && !Object.values(RequestStatus).includes(profileData.requestStatus)) {
-      return res.status(400).json({ success: false, message: 'Invalid request status' });
-    }
-    
     // Check if user exists and has STARTUP role
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
     if (user.role !== 'STARTUP') {
       return res.status(403).json({ success: false, message: 'Only STARTUP users can create company profiles' });
     }
-    
     // Create or update profile
     const profile = await CompanyProfile.findOneAndUpdate(
       { userId },
@@ -93,11 +71,108 @@ const createOrUpdateCompanyProfile = async (req, res) => {
       },
       { new: true, upsert: true }
     );
-    
+    // Compute statistics for this company (stub, to be implemented)
+    // profile.statistics = computeCompanyStatistics(profile);
+    await profile.save();
     res.json({ success: true, data: profile, message: 'Company profile saved successfully' });
   } catch (error) {
     console.error('Error creating/updating company profile:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+// --- NEW: Get statistics for all companies (for dashboard) ---
+const getCompanyStatistics = async (req, res) => {
+  try {
+    // Aggregate statistics for all companies
+    const profiles = await CompanyProfile.find();
+    // Compute statistics (stub, to be implemented)
+    // const stats = computeGlobalStatistics(profiles);
+    const stats = {};
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    console.error('Error getting company statistics:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+// --- NEW: Generate PDF report for a company (French, S2T indicators) ---
+const generateCompanyReportPDF = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const profile = await CompanyProfile.findById(companyId);
+    if (!profile) {
+      return res.status(404).json({ success: false, message: 'Profil d\'entreprise non trouvé' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=rapport-entreprise-${companyId}.pdf`);
+
+    const doc = new PDFDocument({ margin: 40 });
+    doc.pipe(res);
+
+    // Titre principal
+    doc.fontSize(20).text("Rapport d'Analyse des Indicateurs S2T", { align: 'center' });
+    doc.moveDown();
+
+    // Informations de base
+    doc.fontSize(14).text('Informations de l\'Entreprise', { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(12)
+      .text(`Nom de l'entreprise : ${profile.companyName || ''}`)
+      .text(`Fondateur : ${profile.founderName || ''}`)
+      .text(`Email : ${profile.email || ''}`)
+      .text(`Date de création : ${profile.companyCreationDate ? new Date(profile.companyCreationDate).toLocaleDateString('fr-FR') : ''}`)
+      .text(`Domaine d'activité : ${profile.activityDomain || ''}`)
+      .text(`Sous-domaine : ${profile.activitySubDomain || ''}`)
+      .text(`Statut du projet : ${profile.projectProgress || ''}`)
+      .text(`Taille d'équipe : ${profile.staffRange || ''}`)
+      .text(`Adresse : ${profile.address || ''}`)
+      .moveDown();
+
+    // Indicateurs S2T
+    doc.fontSize(14).text('Indicateurs de Performance', { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(12)
+      .text(`Genre du fondateur : ${profile.gender === 'MALE' ? 'Homme' : profile.gender === 'FEMALE' ? 'Femme' : 'Autre'}`)
+      .text(`Étape du projet : ${profile.projectStage || ''}`)
+      .text(`Effectif (nombre d'employés) : ${profile.workforce}`)
+      .text(`Certification qualité : ${profile.qualityCertification ? 'Oui' : 'Non'}`)
+      .text(`Détails de la certification : ${profile.certificationDetails || 'Aucun'}`)
+      .text(`Secteurs d'activité : ${(profile.sectors && profile.sectors.length > 0) ? profile.sectors.join(', ') : 'Non spécifié'}`)
+      .text(`Facteurs de blocage : ${(profile.blockingFactors && profile.blockingFactors.length > 0) ? profile.blockingFactors.join(', ') : 'Aucun'}`)
+      .text(`Interventions requises : ${(profile.interventionsNeeded && profile.interventionsNeeded.length > 0) ? profile.interventionsNeeded.join(', ') : 'Aucune'}`)
+      .moveDown();
+
+    // Notes et observations
+    if (profile.projectNotes) {
+      doc.fontSize(14).text('Notes et Observations', { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(12).text(profile.projectNotes);
+      doc.moveDown();
+    }
+
+    // Analyse et recommandations (exemple statique)
+    doc.fontSize(14).text('Analyse et Recommandations', { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(12)
+      .text("Cette analyse met en évidence les points forts et les axes d'amélioration du projet incubé. Il est recommandé de :")
+      .list([
+        "Renforcer la diversité de genre si déséquilibre constaté.",
+        "Développer des programmes de soutien adaptés aux besoins identifiés.",
+        "Accompagner l'entreprise dans l'obtention de certifications qualité si nécessaire.",
+        "Proposer des formations ou du mentorat pour lever les facteurs de blocage.",
+        "Faciliter l'accès au financement et au marché selon les besoins exprimés."
+      ]);
+    doc.moveDown();
+
+    // Footer
+    doc.fontSize(10).fillColor('gray').text('Rapport généré automatiquement par S2T Incubator', 40, doc.page.height - 50, { align: 'center' });
+
+    doc.end();
+  } catch (error) {
+    console.error('Erreur lors de la génération du rapport PDF:', error);
+    res.status(500).json({ success: false, message: 'Erreur interne du serveur' });
   }
 };
 
@@ -272,5 +347,7 @@ module.exports = {
   checkProfileCompletion,
   getAllCompanyProfiles,
   updateRequestStatus,
-  getEnums
+  getEnums,
+  getCompanyStatistics, // NEW
+  generateCompanyReportPDF // NEW
 };

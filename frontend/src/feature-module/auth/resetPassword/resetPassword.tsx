@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { all_routes } from "../../router/all_routes";
 import ImageWithBasePath from "../../../core/common/imageWithBasePath";
@@ -38,16 +38,7 @@ const ResetPassword = () => {
 
   const [manualToken, setManualToken] = useState('');
 
-  // Check if token is valid on component mount
-  useEffect(() => {
-    if (!token) {
-      setError('Invalid reset link. Please request a new password reset.');
-      return;
-    }
-    validateToken();
-  }, [token]);
-
-  const validateToken = async () => {
+  const validateToken = useCallback(async () => {
     try {
       const response = await authAPI.verifyResetToken(token!);
       if (response.data.success) {
@@ -58,7 +49,16 @@ const ResetPassword = () => {
     } catch (err: any) {
       setError('Invalid or expired reset link. Please request a new password reset.');
     }
-  };
+  }, [token]);
+
+  // Check if token is valid on component mount
+  useEffect(() => {
+    if (!token) {
+      setError('Invalid reset link. Please request a new password reset.');
+      return;
+    }
+    validateToken();
+  }, [token, validateToken]);
 
   const togglePasswordVisibility = (field: PasswordField) => {
     setPasswordVisibility((prevState) => ({

@@ -87,6 +87,9 @@ router.get('/search', authenticateToken, async (req, res) => {
   }
 });
 
+// --- NEW: Statistics dashboard endpoint ---
+router.get('/statistics', authenticateToken, authorizeRoles('S2T', 'ADMIN'), require('../controllers/companyProfileController').getCompanyStatistics);
+
 // Get company profile by ID (for detail dashboard)
 router.get('/detail/:companyId', authenticateToken, authorizeRoles('S2T', 'ADMIN'), async (req, res) => {
   try {
@@ -116,13 +119,16 @@ router.get('/detail/:companyId', authenticateToken, authorizeRoles('S2T', 'ADMIN
   }
 });
 
-// Protected routes
+// Admin routes
+router.get('/admin/all', authenticateToken, getAllCompanyProfiles);
+router.put('/admin/:profileId/status', authenticateToken, updateRequestStatus);
+
+// Protected routes (these must come after specific routes)
 router.get('/check/:userId', authenticateToken, checkProfileCompletion);
 router.get('/:userId', authenticateToken, getCompanyProfile);
 router.post('/:userId', authenticateToken, createOrUpdateCompanyProfile);
 
-// Admin routes
-router.get('/admin/all', authenticateToken, getAllCompanyProfiles);
-router.put('/admin/:profileId/status', authenticateToken, updateRequestStatus);
+// --- NEW: PDF report download endpoint ---
+router.get('/:companyId/report', authenticateToken, authorizeRoles('S2T', 'ADMIN'), require('../controllers/companyProfileController').generateCompanyReportPDF);
 
 module.exports = router; 

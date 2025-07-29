@@ -1,969 +1,542 @@
 // src/feature-module/modals/companyProfileModal.tsx
 import React, { useState, useEffect } from 'react';
-import { useCompanyProfile } from '../../hooks/useCompanyProfile';
-import './companyProfileModal.css';
-
-// Import types from the hook
-interface CompanyProfile {
-  _id?: string;
-  userId: string;
-  
-  // Basic Information
-  consentGiven: boolean;
-  companyName: string;
-  founderName: string;
-  email: string;
-  phone?: string;
-  companyCreationDate: string;
-  
-  // Activity & Domain
-  activityDomain: string;
-  activitySubDomain?: string;
-  
-  // Project & Progress
-  projectProgress: string;
-  stage?: string;
-  
-  // Staff & Organization
-  staffRange: string;
-  staffPositions?: string;
-  
-  // Approval & Status
-  approval?: boolean;
-  requestStatus?: string;
-  responseDate?: string;
-  
-  // Labeling & Classification
-  isLabeled?: boolean;
-  labelType?: string;
-  
-  // Challenges & Barriers
-  barriers?: string;
-  otherBarriers?: string;
-  
-  // Support & Recommendations
-  supportNeeded?: string;
-  supportNeededOther?: string;
-  recommendations?: string;
-  
-  // Company Identity
-  slogan?: string;
-  logo?: string;
-  
-  // Business Information
-  businessPlanSummary?: string;
-  marketAnalysis?: string;
-  targetMarket?: string;
-  competitors?: string;
-  competitiveAdvantage?: string;
-  riskFactors?: string;
-  
-  // Recognition & Values
-  awards?: string;
-  values?: string;
-  
-  // Additional Information
-  longDescription?: string;
-  website?: string;
-  address?: string;
-  
-  // Timestamps
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface ProfileData {
-  isStartup: boolean;
-  hasProfile: boolean;
-  isProfileComplete: boolean;
-  profile: CompanyProfile | null;
-}
+import { useUser } from '../../hooks/useUser';
+import companyProfileService from '../../services/companyProfileService';
 
 interface CompanyProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess: () => void;
+  initialData?: any;
 }
 
-interface FormData {
-  // Basic Information
-  consentGiven: boolean;
-  companyName: string;
-  founderName: string;
-  email: string;
-  phone: string;
-  companyCreationDate: string;
-  
-  // Activity & Domain
-  activityDomain: string;
-  activitySubDomain: string;
-  
-  // Project & Progress
-  projectProgress: string;
-  stage: string;
-  
-  // Staff & Organization
-  staffRange: string;
-  staffPositions: string;
-  
-  // Approval & Status
-  approval: boolean;
-  requestStatus: string;
-  
-  // Labeling & Classification
-  isLabeled: boolean;
-  labelType: string;
-  
-  // Challenges & Barriers
-  barriers: string;
-  otherBarriers: string;
-  
-  // Support & Recommendations
-  supportNeeded: string;
-  supportNeededOther: string;
-  recommendations: string;
-  
-  // Company Identity
-  slogan: string;
-  logo: string;
-  
-  // Business Information
-  businessPlanSummary: string;
-  marketAnalysis: string;
-  targetMarket: string;
-  competitors: string;
-  competitiveAdvantage: string;
-  riskFactors: string;
-  
-  // Recognition & Values
-  awards: string;
-  values: string;
-  
-  // Additional Information
-  longDescription: string;
-  website: string;
-  address: string;
-}
+const CompanyProfileModal: React.FC<CompanyProfileModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  initialData
+}) => {
+  const { user } = useUser();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [enums, setEnums] = useState<any>(null);
 
-const CompanyProfileModal: React.FC<CompanyProfileModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { profileData, loading, createOrUpdateProfile, getEnums } = useCompanyProfile();
-  
-  const [formData, setFormData] = useState<FormData>({
-    // Basic Information
+  // Formulaire avec tous les nouveaux indicateurs
+  const [formData, setFormData] = useState({
+    // --- INFORMATIONS DE BASE ---
     consentGiven: false,
     companyName: '',
     founderName: '',
     email: '',
-    phone: '',
     companyCreationDate: '',
     
-    // Activity & Domain
+    // --- DOMAINE D'ACTIVITÉ ---
     activityDomain: '',
     activitySubDomain: '',
     
-    // Project & Progress
+    // --- PROJET ET PROGRÈS ---
     projectProgress: '',
-    stage: '',
     
-    // Staff & Organization
+    // --- EFFECTIF ET ORGANISATION ---
     staffRange: '',
-    staffPositions: '',
     
-    // Approval & Status
-    approval: false,
-    requestStatus: '',
+    // --- ADRESSE ---
+    address: '',
     
-    // Labeling & Classification
-    isLabeled: false,
-    labelType: '',
-    
-    // Challenges & Barriers
-    barriers: '',
-    otherBarriers: '',
-    
-    // Support & Recommendations
-    supportNeeded: '',
-    supportNeededOther: '',
-    recommendations: '',
-    
-    // Company Identity
-    slogan: '',
-    logo: '',
-    
-    // Business Information
-    businessPlanSummary: '',
-    marketAnalysis: '',
-    targetMarket: '',
-    competitors: '',
-    competitiveAdvantage: '',
-    riskFactors: '',
-    
-    // Recognition & Values
-    awards: '',
-    values: '',
-    
-    // Additional Information
-    longDescription: '',
-    website: '',
-    address: ''
+    // --- NOUVEAUX INDICATEURS ---
+    gender: 'MALE' as 'MALE' | 'FEMALE' | 'OTHER',
+    sectors: [] as string[],
+    qualityCertification: false,
+    certificationDetails: '',
+    projectStage: 'IDEA' as 'IDEA' | 'PROTOTYPE' | 'PILOT' | 'MARKET_ENTRY' | 'SCALING',
+    workforce: 0,
+    blockingFactors: [] as string[],
+    interventionsNeeded: [] as string[],
+    projectNotes: '',
   });
 
-  const [enums, setEnums] = useState<{
-    ActivityDomain: Record<string, string>;
-    ActivitySubDomain: Record<string, string>;
-    ProjectProgress: Record<string, string>;
-    StaffRange: Record<string, string>;
-    RequestStatus: Record<string, string>;
-    CompanyStage: Record<string, string>;
-    LabelType: Record<string, string>;
-    SupportNeeded: Record<string, string>;
-  } | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('basic');
-
-  // Load enums on component mount
+  // Charger les enums au montage
   useEffect(() => {
-    const loadEnums = async () => {
-      try {
-        const enumData = await getEnums();
-        setEnums(enumData);
-      } catch (error) {
-        console.error('Error loading enums:', error);
+    loadEnums();
+  }, []);
+
+  // Charger les données initiales si fournies
+  useEffect(() => {
+    if (initialData) {
+      setFormData(prev => ({ ...prev, ...initialData }));
+    }
+  }, [initialData]);
+
+  const loadEnums = async () => {
+    try {
+      const response = await companyProfileService.getEnums();
+      if (response.success) {
+        setEnums(response.data);
       }
-    };
-
-    if (isOpen) {
-      loadEnums();
+    } catch (error) {
+      console.error('Erreur lors du chargement des enums:', error);
     }
-  }, [isOpen, getEnums]);
+  };
 
-  // Pre-populate form if profile data exists
-  useEffect(() => {
-    if (profileData && profileData.profile && profileData.profile !== null) {
-      const profile: CompanyProfile = profileData.profile;
-      setFormData({
-        // Basic Information
-        consentGiven: profile.consentGiven || false,
-        companyName: profile.companyName || '',
-        founderName: profile.founderName || '',
-        email: profile.email || '',
-        phone: profile.phone || '',
-        companyCreationDate: profile.companyCreationDate || '',
-        
-        // Activity & Domain
-        activityDomain: profile.activityDomain || '',
-        activitySubDomain: profile.activitySubDomain || '',
-        
-        // Project & Progress
-        projectProgress: profile.projectProgress || '',
-        stage: profile.stage || '',
-        
-        // Staff & Organization
-        staffRange: profile.staffRange || '',
-        staffPositions: profile.staffPositions || '',
-        
-        // Approval & Status
-        approval: profile.approval || false,
-        requestStatus: profile.requestStatus || '',
-        
-        // Labeling & Classification
-        isLabeled: profile.isLabeled || false,
-        labelType: profile.labelType || '',
-        
-        // Challenges & Barriers
-        barriers: profile.barriers || '',
-        otherBarriers: profile.otherBarriers || '',
-        
-        // Support & Recommendations
-        supportNeeded: profile.supportNeeded || '',
-        supportNeededOther: profile.supportNeededOther || '',
-        recommendations: profile.recommendations || '',
-        
-        // Company Identity
-        slogan: profile.slogan || '',
-        logo: profile.logo || '',
-        
-        // Business Information
-        businessPlanSummary: profile.businessPlanSummary || '',
-        marketAnalysis: profile.marketAnalysis || '',
-        targetMarket: profile.targetMarket || '',
-        competitors: profile.competitors || '',
-        competitiveAdvantage: profile.competitiveAdvantage || '',
-        riskFactors: profile.riskFactors || '',
-        
-        // Recognition & Values
-        awards: profile.awards || '',
-        values: profile.values || '',
-        
-        // Additional Information
-        longDescription: profile.longDescription || '',
-        website: profile.website || '',
-        address: profile.address || ''
-      });
-    }
-  }, [profileData]);
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    
-    if (type === 'checkbox') {
-      const checked = (e.target as HTMLInputElement).checked;
-      setFormData(prev => ({
-        ...prev,
-        [name]: checked
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
+  const handleArrayChange = (field: string, value: string, action: 'add' | 'remove') => {
+    setFormData(prev => {
+      const currentArray = prev[field as keyof typeof prev] as string[];
+      if (action === 'add' && !currentArray.includes(value)) {
+        return { ...prev, [field]: [...currentArray, value] };
+      } else if (action === 'remove') {
+        return { ...prev, [field]: currentArray.filter(item => item !== value) };
+      }
+      return prev;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    setLoading(true);
+    setError(null);
 
     try {
-      await createOrUpdateProfile(formData);
-      onClose();
-      // Call onSuccess callback if provided
-      if (onSuccess) {
-        onSuccess();
+      const userId = user?._id;
+      if (!userId) {
+        setError('Utilisateur non identifié');
+        return;
       }
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      // Handle error (show toast, etc.)
+
+      const response = await companyProfileService.createCompanyProfile({
+        ...formData,
+        userId
+      });
+
+      if (response.success) {
+        onSuccess();
+        onClose();
+      } else {
+        setError(response.message || 'Échec de la sauvegarde du profil');
+      }
+    } catch (error: any) {
+      setError(error.message || 'Erreur lors de la sauvegarde');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
-      <div className="modal-dialog modal-xl modal-dialog-scrollable" onClick={(e) => e.stopPropagation()}>
+    <div className="modal fade show" style={{ display: 'block' }} tabIndex={-1}>
+      <div className="modal-dialog modal-lg">
         <div className="modal-content">
-          <div className="modal-header bg-primary text-white">
-            <h4 className="modal-title">
-              <i className="fas fa-building me-2"></i>
-              Company Profile
-            </h4>
-            <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
-        </div>
-
-          <div className="modal-body p-0">
-            {/* Navigation Tabs */}
-            <ul className="nav nav-tabs nav-fill" id="profileTabs" role="tablist">
-              <li className="nav-item" role="presentation">
-                <button 
-                  className={`nav-link ${activeTab === 'basic' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('basic')}
-                >
-                  <i className="fas fa-info-circle me-1"></i>
-                  Basic Info
-                </button>
-              </li>
-              <li className="nav-item" role="presentation">
-                <button 
-                  className={`nav-link ${activeTab === 'business' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('business')}
-                >
-                  <i className="fas fa-chart-line me-1"></i>
-                  Business
-                </button>
-              </li>
-              <li className="nav-item" role="presentation">
-                <button 
-                  className={`nav-link ${activeTab === 'team' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('team')}
-                >
-                  <i className="fas fa-users me-1"></i>
-                  Team
-                </button>
-              </li>
-              <li className="nav-item" role="presentation">
-                <button 
-                  className={`nav-link ${activeTab === 'challenges' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('challenges')}
-                >
-                  <i className="fas fa-exclamation-triangle me-1"></i>
-                  Challenges
-                </button>
-              </li>
-              <li className="nav-item" role="presentation">
-                <button 
-                  className={`nav-link ${activeTab === 'additional' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('additional')}
-                >
-                  <i className="fas fa-plus-circle me-1"></i>
-                  Additional
-                </button>
-              </li>
-            </ul>
-
-            <form onSubmit={handleSubmit} className="p-4">
-              {/* Basic Information Tab */}
-              {activeTab === 'basic' && (
-                <div className="tab-content">
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <div className="form-check">
-              <input
-                type="checkbox"
-                          className="form-check-input"
-                name="consentGiven"
-                checked={formData.consentGiven}
-                onChange={handleInputChange}
-                required
-              />
-                        <label className="form-check-label">
-                          I consent to data processing and agree to the terms and conditions
-            </label>
-                      </div>
-                    </div>
+          <div className="modal-header">
+            <h5 className="modal-title">Profil de l'Entreprise - Indicateurs S2T</h5>
+            <button type="button" className="btn-close" onClick={onClose}></button>
           </div>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Company Name *</label>
-            <input
-              type="text"
-                        className="form-control"
-              name="companyName"
-              value={formData.companyName}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Founder Name *</label>
-            <input
-              type="text"
-                        className="form-control"
-              name="founderName"
-              value={formData.founderName}
-              onChange={handleInputChange}
-              required
-            />
-                    </div>
-          </div>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Email *</label>
-            <input
-              type="email"
-                        className="form-control"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Phone</label>
-            <input
-              type="tel"
-                        className="form-control"
-              name="phone"
-              value={formData.phone}
-              onChange={handleInputChange}
-            />
-                    </div>
-          </div>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Company Creation Date *</label>
-            <input
-              type="date"
-                        className="form-control"
-              name="companyCreationDate"
-              value={formData.companyCreationDate}
-              onChange={handleInputChange}
-              required
-            />
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Website</label>
-                      <input
-                        type="url"
-                        className="form-control"
-                        name="website"
-                        value={formData.website}
-                        onChange={handleInputChange}
-                        placeholder="https://example.com"
-                      />
-                    </div>
-          </div>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Activity Domain *</label>
-            <select
-                        className="form-select"
-              name="activityDomain"
-              value={formData.activityDomain}
-              onChange={handleInputChange}
-              required
-            >
-                        <option value="">Select Activity Domain</option>
-              {enums?.ActivityDomain && Object.entries(enums.ActivityDomain).map(([key, value]) => (
-                          <option key={key} value={key}>{value}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Activity Subdomain</label>
-                      <select
-                        className="form-select"
-                        name="activitySubDomain"
-                        value={formData.activitySubDomain}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select Activity Subdomain</option>
-                        {enums?.ActivitySubDomain && Object.entries(enums.ActivitySubDomain).map(([key, value]) => (
-                          <option key={key} value={key}>{value}</option>
-              ))}
-            </select>
-                    </div>
-          </div>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Project Progress *</label>
-            <select
-                        className="form-select"
-              name="projectProgress"
-              value={formData.projectProgress}
-              onChange={handleInputChange}
-              required
-            >
-                        <option value="">Select Project Progress</option>
-              {enums?.ProjectProgress && Object.entries(enums.ProjectProgress).map(([key, value]) => (
-                          <option key={key} value={key}>{value}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Company Stage</label>
-                      <select
-                        className="form-select"
-                        name="stage"
-                        value={formData.stage}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select Company Stage</option>
-                        {enums?.CompanyStage && Object.entries(enums.CompanyStage).map(([key, value]) => (
-                          <option key={key} value={key}>{value}</option>
-              ))}
-            </select>
-                    </div>
-          </div>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Staff Range *</label>
-            <select
-                        className="form-select"
-              name="staffRange"
-              value={formData.staffRange}
-              onChange={handleInputChange}
-              required
-            >
-                        <option value="">Select Staff Range</option>
-              {enums?.StaffRange && Object.entries(enums.StaffRange).map(([key, value]) => (
-                          <option key={key} value={key}>{value}</option>
-              ))}
-            </select>
-          </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Address</label>
-            <textarea
-                        className="form-control"
-              name="address"
-              value={formData.address}
-              onChange={handleInputChange}
-              rows={3}
-            />
-          </div>
-                  </div>
+          
+          <form onSubmit={handleSubmit}>
+            <div className="modal-body">
+              {error && (
+                <div className="alert alert-danger" role="alert">
+                  {error}
                 </div>
               )}
 
-              {/* Business Information Tab */}
-              {activeTab === 'business' && (
-                <div className="tab-content">
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <label className="form-label">Company Slogan</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="slogan"
-                        value={formData.slogan}
-                        onChange={handleInputChange}
-                        placeholder="Your company's tagline or slogan"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <label className="form-label">Business Plan Summary</label>
-                      <textarea
-                        className="form-control"
-                        name="businessPlanSummary"
-                        value={formData.businessPlanSummary}
-                        onChange={handleInputChange}
-                        rows={4}
-                        placeholder="Brief summary of your business plan"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Target Market</label>
-                      <textarea
-                        className="form-control"
-                        name="targetMarket"
-                        value={formData.targetMarket}
-                        onChange={handleInputChange}
-                        rows={3}
-                        placeholder="Describe your target market"
-                      />
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Competitors</label>
-                      <textarea
-                        className="form-control"
-                        name="competitors"
-                        value={formData.competitors}
-                        onChange={handleInputChange}
-                        rows={3}
-                        placeholder="List your main competitors"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Competitive Advantage</label>
-                      <textarea
-                        className="form-control"
-                        name="competitiveAdvantage"
-                        value={formData.competitiveAdvantage}
-                        onChange={handleInputChange}
-                        rows={3}
-                        placeholder="What makes you unique?"
-                      />
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Risk Factors</label>
-                      <textarea
-                        className="form-control"
-                        name="riskFactors"
-                        value={formData.riskFactors}
-                        onChange={handleInputChange}
-                        rows={3}
-                        placeholder="Main risk factors for your business"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <label className="form-label">Market Analysis</label>
-                      <textarea
-                        className="form-control"
-                        name="marketAnalysis"
-                        value={formData.marketAnalysis}
-                        onChange={handleInputChange}
-                        rows={4}
-                        placeholder="Your market analysis and insights"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Team Tab */}
-              {activeTab === 'team' && (
-                <div className="tab-content">
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <label className="form-label">Staff Positions</label>
-                      <textarea
-                        className="form-control"
-                        name="staffPositions"
-                        value={formData.staffPositions}
-                        onChange={handleInputChange}
-                        rows={3}
-                        placeholder="e.g., CEO, CTO, Developer, Designer (separate with commas)"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <div className="form-check">
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          name="isLabeled"
-                          checked={formData.isLabeled}
-                          onChange={handleInputChange}
-                        />
-                        <label className="form-check-label">
-                          Is your company labeled/certified?
-                        </label>
-                      </div>
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Label Type</label>
-                      <select
-                        className="form-select"
-                        name="labelType"
-                        value={formData.labelType}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select Label Type</option>
-                        {enums?.LabelType && Object.entries(enums.LabelType).map(([key, value]) => (
-                          <option key={key} value={key}>{value}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <label className="form-label">Company Values</label>
-                      <textarea
-                        className="form-control"
-                        name="values"
-                        value={formData.values}
-                        onChange={handleInputChange}
-                        rows={3}
-                        placeholder="What are your company's core values?"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <label className="form-label">Awards & Recognition</label>
-                      <textarea
-                        className="form-control"
-                        name="awards"
-                        value={formData.awards}
-                        onChange={handleInputChange}
-                        rows={3}
-                        placeholder="List any awards, certifications, or recognition received"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Challenges Tab */}
-              {activeTab === 'challenges' && (
-                <div className="tab-content">
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <label className="form-label">Main Barriers/Challenges</label>
-                      <textarea
-                        className="form-control"
-                        name="barriers"
-                        value={formData.barriers}
-                        onChange={handleInputChange}
-                        rows={4}
-                        placeholder="What are the main challenges your company faces?"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <label className="form-label">Other Barriers</label>
-                      <textarea
-                        className="form-control"
-                        name="otherBarriers"
-                        value={formData.otherBarriers}
-                        onChange={handleInputChange}
-                        rows={3}
-                        placeholder="Any other barriers not mentioned above"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Support Needed</label>
-                      <select
-                        className="form-select"
-                        name="supportNeeded"
-                        value={formData.supportNeeded}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select Support Type</option>
-                        {enums?.SupportNeeded && Object.entries(enums.SupportNeeded).map(([key, value]) => (
-                          <option key={key} value={key}>{value}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Other Support Needed</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="supportNeededOther"
-                        value={formData.supportNeededOther}
-                        onChange={handleInputChange}
-                        placeholder="Other types of support"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <label className="form-label">Recommendations</label>
-                      <textarea
-                        className="form-control"
-                        name="recommendations"
-                        value={formData.recommendations}
-                        onChange={handleInputChange}
-                        rows={4}
-                        placeholder="What recommendations do you have for improvement?"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Additional Information Tab */}
-              {activeTab === 'additional' && (
-                <div className="tab-content">
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <label className="form-label">Long Description</label>
-                      <textarea
-                        className="form-control"
-                        name="longDescription"
-                        value={formData.longDescription}
-                        onChange={handleInputChange}
-                        rows={6}
-                        placeholder="Detailed description of your company, mission, and vision"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <div className="form-check">
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          name="approval"
-                          checked={formData.approval}
-                          onChange={handleInputChange}
-                        />
-                        <label className="form-check-label">
-                          I approve the data provided
-                        </label>
-                      </div>
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label">Request Status</label>
-                      <select
-                        className="form-select"
-                        name="requestStatus"
-                        value={formData.requestStatus}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select Status</option>
-                        {enums?.RequestStatus && Object.entries(enums.RequestStatus).map(([key, value]) => (
-                          <option key={key} value={key}>{value}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Navigation Buttons */}
-              <div className="d-flex justify-content-between mt-4">
-                <div>
-                  {activeTab !== 'basic' && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary me-2"
-                      onClick={() => {
-                        const tabs = ['basic', 'business', 'team', 'challenges', 'additional'];
-                        const currentIndex = tabs.indexOf(activeTab);
-                        if (currentIndex > 0) {
-                          setActiveTab(tabs[currentIndex - 1]);
-                        }
-                      }}
-                    >
-                      <i className="fas fa-arrow-left me-1"></i>
-                      Previous
-                    </button>
-                  )}
+              {/* INFORMATIONS DE BASE */}
+              <div className="row mb-4">
+                <div className="col-12">
+                  <h6 className="text-primary mb-3">
+                    <i className="fas fa-info-circle me-2"></i>
+                    Informations de Base
+                  </h6>
                 </div>
                 
-                <div>
-                  {activeTab !== 'additional' && (
-                    <button
-                      type="button"
-                      className="btn btn-primary me-2"
-                      onClick={() => {
-                        const tabs = ['basic', 'business', 'team', 'challenges', 'additional'];
-                        const currentIndex = tabs.indexOf(activeTab);
-                        if (currentIndex < tabs.length - 1) {
-                          setActiveTab(tabs[currentIndex + 1]);
-                        }
-                      }}
-                    >
-                      Next
-                      <i className="fas fa-arrow-right ms-1"></i>
-                    </button>
-                  )}
-                  
-                  {activeTab === 'additional' && (
-                    <button
-                      type="submit"
-                      className="btn btn-success me-2"
-                      disabled={isSubmitting || loading}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <i className="fas fa-save me-1"></i>
-                          Save Profile
-                        </>
-                      )}
-                    </button>
-                  )}
-                  
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={onClose}
-                    disabled={isSubmitting}
-                  >
-              Cancel
-            </button>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Nom de l'Entreprise *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={formData.companyName}
+                      onChange={(e) => handleInputChange('companyName', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Nom du Fondateur *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={formData.founderName}
+                      onChange={(e) => handleInputChange('founderName', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Email *</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Date de Création *</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={formData.companyCreationDate}
+                      onChange={(e) => handleInputChange('companyCreationDate', e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
               </div>
-            </form>
-          </div>
+
+              {/* NOUVEAUX INDICATEURS */}
+              <div className="row mb-4">
+                <div className="col-12">
+                  <h6 className="text-success mb-3">
+                    <i className="fas fa-chart-line me-2"></i>
+                    Indicateurs de Performance
+                  </h6>
+                </div>
+                
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Genre du Fondateur *</label>
+                    <select
+                      className="form-select"
+                      value={formData.gender}
+                      onChange={(e) => handleInputChange('gender', e.target.value)}
+                      required
+                    >
+                      <option value="">Sélectionner...</option>
+                      <option value="MALE">Homme</option>
+                      <option value="FEMALE">Femme</option>
+                      <option value="OTHER">Autre</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Étape du Projet *</label>
+                    <select
+                      className="form-select"
+                      value={formData.projectStage}
+                      onChange={(e) => handleInputChange('projectStage', e.target.value)}
+                      required
+                    >
+                      <option value="">Sélectionner...</option>
+                      <option value="IDEA">Idée</option>
+                      <option value="PROTOTYPE">Prototype</option>
+                      <option value="PILOT">Pilote</option>
+                      <option value="MARKET_ENTRY">Entrée Marché</option>
+                      <option value="SCALING">Mise à l'Échelle</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Effectif (Nombre d'employés)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={formData.workforce}
+                      onChange={(e) => handleInputChange('workforce', parseInt(e.target.value) || 0)}
+                      min="0"
+                    />
+                  </div>
+                </div>
+                
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Certification Qualité</label>
+                    <div className="form-check">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        checked={formData.qualityCertification}
+                        onChange={(e) => handleInputChange('qualityCertification', e.target.checked)}
+                      />
+                      <label className="form-check-label">
+                        L'entreprise possède une certification qualité
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                
+                {formData.qualityCertification && (
+                  <div className="col-12">
+                    <div className="form-group mb-3">
+                      <label className="form-label">Détails de la Certification</label>
+                      <textarea
+                        className="form-control"
+                        rows={3}
+                        value={formData.certificationDetails}
+                        onChange={(e) => handleInputChange('certificationDetails', e.target.value)}
+                        placeholder="Décrivez les certifications obtenues..."
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTEURS D'ACTIVITÉ */}
+              <div className="row mb-4">
+                <div className="col-12">
+                  <h6 className="text-info mb-3">
+                    <i className="fas fa-industry me-2"></i>
+                    Secteurs d'Activité
+                  </h6>
+                </div>
+                
+                <div className="col-12">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Secteurs d'Activité</label>
+                    <div className="row">
+                      {['Technologie', 'Agriculture', 'Santé', 'Éducation', 'Finance', 'Commerce', 'Transport', 'Énergie', 'Environnement', 'Tourisme'].map((sector) => (
+                        <div key={sector} className="col-md-4 mb-2">
+                          <div className="form-check">
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={formData.sectors.includes(sector)}
+                              onChange={(e) => handleArrayChange('sectors', sector, e.target.checked ? 'add' : 'remove')}
+                            />
+                            <label className="form-check-label">{sector}</label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* FACTEURS DE BLOCAGE */}
+              <div className="row mb-4">
+                <div className="col-12">
+                  <h6 className="text-warning mb-3">
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    Facteurs de Blocage
+                  </h6>
+                </div>
+                
+                <div className="col-12">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Facteurs de Blocage Identifiés</label>
+                    <div className="row">
+                      {['Accès au Financement', 'Conformité Réglementaire', 'Accès au Marché', 'Expertise Technique', 'Infrastructure', 'Ressources Humaines'].map((factor) => (
+                        <div key={factor} className="col-md-6 mb-2">
+                          <div className="form-check">
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={formData.blockingFactors.includes(factor)}
+                              onChange={(e) => handleArrayChange('blockingFactors', factor, e.target.checked ? 'add' : 'remove')}
+                            />
+                            <label className="form-check-label">{factor}</label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* INTERVENTIONS REQUISES */}
+              <div className="row mb-4">
+                <div className="col-12">
+                  <h6 className="text-danger mb-3">
+                    <i className="fas fa-hands-helping me-2"></i>
+                    Interventions Requises
+                  </h6>
+                </div>
+                
+                <div className="col-12">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Types d'Interventions Nécessaires</label>
+                    <div className="row">
+                      {['Consultation Stratégie', 'Formation Technique', 'Assistance Financière', 'Support Marché', 'Facilitation Réseautage', 'Mentorat'].map((intervention) => (
+                        <div key={intervention} className="col-md-6 mb-2">
+                          <div className="form-check">
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={formData.interventionsNeeded.includes(intervention)}
+                              onChange={(e) => handleArrayChange('interventionsNeeded', intervention, e.target.checked ? 'add' : 'remove')}
+                            />
+                            <label className="form-check-label">{intervention}</label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* INFORMATIONS TRADITIONNELLES */}
+              <div className="row mb-4">
+                <div className="col-12">
+                  <h6 className="text-secondary mb-3">
+                    <i className="fas fa-building me-2"></i>
+                    Informations de l'Entreprise
+                  </h6>
+                </div>
+                
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Domaine d'Activité *</label>
+                    <select
+                      className="form-select"
+                      value={formData.activityDomain}
+                      onChange={(e) => handleInputChange('activityDomain', e.target.value)}
+                      required
+                    >
+                      <option value="">Sélectionner...</option>
+                      {enums?.ActivityDomain && Object.entries(enums.ActivityDomain).map(([key, value]) => (
+                        <option key={key} value={key}>{value as string}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Sous-Domaine</label>
+                    <select
+                      className="form-select"
+                      value={formData.activitySubDomain}
+                      onChange={(e) => handleInputChange('activitySubDomain', e.target.value)}
+                    >
+                      <option value="">Sélectionner...</option>
+                      {enums?.ActivitySubDomain && Object.entries(enums.ActivitySubDomain).map(([key, value]) => (
+                        <option key={key} value={key}>{value as string}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Avancement du Projet *</label>
+                    <select
+                      className="form-select"
+                      value={formData.projectProgress}
+                      onChange={(e) => handleInputChange('projectProgress', e.target.value)}
+                      required
+                    >
+                      <option value="">Sélectionner...</option>
+                      {enums?.ProjectProgress && Object.entries(enums.ProjectProgress).map(([key, value]) => (
+                        <option key={key} value={key}>{value as string}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Effectif *</label>
+                    <select
+                      className="form-select"
+                      value={formData.staffRange}
+                      onChange={(e) => handleInputChange('staffRange', e.target.value)}
+                      required
+                    >
+                      <option value="">Sélectionner...</option>
+                      {enums?.StaffRange && Object.entries(enums.StaffRange).map(([key, value]) => (
+                        <option key={key} value={key}>{value as string}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="col-12">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Adresse</label>
+                    <textarea
+                      className="form-control"
+                      rows={2}
+                      value={formData.address}
+                      onChange={(e) => handleInputChange('address', e.target.value)}
+                      placeholder="Adresse complète de l'entreprise..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* NOTES DU PROJET */}
+              <div className="row mb-4">
+                <div className="col-12">
+                  <h6 className="text-dark mb-3">
+                    <i className="fas fa-sticky-note me-2"></i>
+                    Notes du Projet
+                  </h6>
+                </div>
+                
+                <div className="col-12">
+                  <div className="form-group mb-3">
+                    <label className="form-label">Notes et Observations</label>
+                    <textarea
+                      className="form-control"
+                      rows={4}
+                      value={formData.projectNotes}
+                      onChange={(e) => handleInputChange('projectNotes', e.target.value)}
+                      placeholder="Ajoutez des notes, observations ou commentaires sur le projet..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* CONSENTEMENT */}
+              <div className="row mb-4">
+                <div className="col-12">
+                  <div className="form-check">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={formData.consentGiven}
+                      onChange={(e) => handleInputChange('consentGiven', e.target.checked)}
+                      required
+                    />
+                    <label className="form-check-label">
+                      Je consens à ce que mes données soient utilisées par S2T Incubator pour l'analyse et le support *
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={onClose}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                {loading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                    Sauvegarde...
+                  </>
+                ) : (
+                  'Sauvegarder le Profil'
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

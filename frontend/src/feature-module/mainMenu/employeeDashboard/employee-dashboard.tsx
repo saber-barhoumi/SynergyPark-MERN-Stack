@@ -19,7 +19,7 @@ import "./employee-dashboard.css";
 
 const EmployeeDashboard = () => {
   const routes = all_routes;
-  const { shouldShowModal, refreshProfileData } = useCompanyProfile();
+  const { companyProfile, loading, error } = useCompanyProfile();
   const { user, userStats, loading: userLoading, error: userError } = useUser();
   const [showCompanyProfileModal, setShowCompanyProfileModal] = useState(false);
 
@@ -27,14 +27,14 @@ const EmployeeDashboard = () => {
 
   // Show modal after 1 minute if user is STARTUP and profile is incomplete
   useEffect(() => {
-    if (shouldShowModal) {
+    if (user?.role === 'STARTUP' && !companyProfile) {
       const timer = setTimeout(() => {
         setShowCompanyProfileModal(true);
       }, 60000); // 1 minute
 
       return () => clearTimeout(timer);
     }
-  }, [shouldShowModal]);
+  }, [user?.role, companyProfile]);
 
   //New Chart
   const [leavesChart] = useState<any>({
@@ -205,7 +205,7 @@ const EmployeeDashboard = () => {
           </div>
           {/* /Breadcrumb */}
           <div className="alert bg-secondary-transparent alert-dismissible fade show mb-4">
-            Your Leave Request on“24th April 2024”has been Approved!!!
+            Your Leave Request on"24th April 2024"has been Approved!!!
             <button
               type="button"
               className="btn-close fs-14"
@@ -246,7 +246,7 @@ const EmployeeDashboard = () => {
                         )}
                       </h5>
                       <div className="d-flex align-items-center">
-                        <p className="text-white fs-12 mb-0">
+                        <div className="text-white fs-12 mb-0">
                           {userLoading ? (
                             <div className="placeholder-glow">
                               <span className="placeholder col-6"></span>
@@ -256,11 +256,11 @@ const EmployeeDashboard = () => {
                           ) : (
                             'Position Not Set'
                           )}
-                        </p>
+                        </div>
                         <span className="mx-1">
                           <i className="ti ti-point-filled text-primary" />
                         </span>
-                        <p className="fs-12">
+                        <div className="fs-12">
                           {userLoading ? (
                             <div className="placeholder-glow">
                               <span className="placeholder col-4"></span>
@@ -270,7 +270,7 @@ const EmployeeDashboard = () => {
                           ) : (
                             'Department Not Set'
                           )}
-                        </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -285,7 +285,7 @@ const EmployeeDashboard = () => {
                 <div className="card-body">
                   <div className="mb-3">
                     <span className="d-block mb-1 fs-13">Phone Number</span>
-                    <p className="text-gray-9">
+                    <div className="text-gray-9">
                       {userLoading ? (
                         <div className="placeholder-glow">
                           <span className="placeholder col-6"></span>
@@ -295,11 +295,11 @@ const EmployeeDashboard = () => {
                       ) : (
                         'Phone Not Set'
                       )}
-                    </p>
+                    </div>
                   </div>
                   <div className="mb-3">
                     <span className="d-block mb-1 fs-13">Email Address</span>
-                    <p className="text-gray-9">
+                    <div className="text-gray-9">
                       {userLoading ? (
                         <div className="placeholder-glow">
                           <span className="placeholder col-8"></span>
@@ -309,11 +309,11 @@ const EmployeeDashboard = () => {
                       ) : (
                         'Email Not Available'
                       )}
-                    </p>
+                    </div>
                   </div>
                   <div className="mb-3">
                     <span className="d-block mb-1 fs-13">Department</span>
-                    <p className="text-gray-9">
+                    <div className="text-gray-9">
                       {userLoading ? (
                         <div className="placeholder-glow">
                           <span className="placeholder col-5"></span>
@@ -323,11 +323,11 @@ const EmployeeDashboard = () => {
                       ) : (
                         'Department Not Set'
                       )}
-                    </p>
+                    </div>
                   </div>
                   <div>
                     <span className="d-block mb-1 fs-13">Joined on</span>
-                    <p className="text-gray-9">
+                    <div className="text-gray-9">
                       {userLoading ? (
                         <div className="placeholder-glow">
                           <span className="placeholder col-4"></span>
@@ -338,16 +338,10 @@ const EmployeeDashboard = () => {
                           month: 'short',
                           day: 'numeric'
                         })
-                      ) : user?.createdAt ? (
-                        new Date(user.createdAt).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })
                       ) : (
-                        'Date Not Available'
+                        'Date Not Set'
                       )}
-                    </p>
+                    </div>
                   </div>
                   {userError && (
                     <div className="alert alert-danger mt-3" role="alert">
@@ -2265,7 +2259,6 @@ const EmployeeDashboard = () => {
         isOpen={showCompanyProfileModal}
         onClose={() => setShowCompanyProfileModal(false)}
         onSuccess={() => {
-          refreshProfileData();
           setShowCompanyProfileModal(false);
         }}
       />

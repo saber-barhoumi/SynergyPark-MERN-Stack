@@ -102,7 +102,7 @@ const companyProfileSchema = new mongoose.Schema({
   
   // Activity & Domain
   activityDomain: { type: String, enum: Object.values(ActivityDomain), required: true },
-  activitySubDomain: { type: String, enum: Object.values(ActivitySubDomain), default: '' },
+  activitySubDomain: { type: String, enum: [...Object.values(ActivitySubDomain), ''], default: '' },
   
   // Project & Progress
   projectProgress: { type: String, enum: Object.values(ProjectProgress), required: true },
@@ -119,7 +119,7 @@ const companyProfileSchema = new mongoose.Schema({
   
   // Labeling & Classification
   isLabeled: { type: Boolean, default: false },
-  labelType: { type: String, enum: Object.values(LabelType), default: '' },
+  labelType: { type: String, enum: [...Object.values(LabelType), ''], default: '' },
   
   // Challenges & Barriers
   barriers: { type: String, default: '' }, // The company's challenges
@@ -150,6 +150,28 @@ const companyProfileSchema = new mongoose.Schema({
   longDescription: { type: String, default: '' }, // A long description of the company
   website: { type: String, default: '' },
   address: { type: String, default: '' },
+  
+  // --- INDICATORS (RAW DATA) ---
+  gender: { type: String, enum: ['MALE', 'FEMALE', 'OTHER'], required: true }, // Gender of founder or team lead
+  sectors: [{ type: String }], // List of business sectors (e.g., ['TECHNOLOGY', 'AGRICULTURE'])
+  qualityCertification: { type: Boolean, default: false }, // Has quality certification?
+  certificationDetails: { type: String, default: '' }, // Details if certified
+  projectStage: { type: String, enum: ['IDEA', 'PROTOTYPE', 'PILOT', 'MARKET_ENTRY', 'SCALING'], required: true },
+  workforce: { type: Number, default: 0 }, // Number of employees
+  blockingFactors: [{ type: String }], // List of blocking factors
+  interventionsNeeded: [{ type: String }], // List of required interventions
+  projectNotes: { type: String, default: '' }, // Notes/observations (SWOT, etc.)
+
+  // --- INDICATORS (COMPUTED STATISTICS) ---
+  statistics: {
+    genderDistribution: { male: Number, female: Number, other: Number, total: Number },
+    sectorDistribution: { type: Map, of: Number },
+    certificationRate: { labeled: Number, unlabeled: Number, total: Number },
+    projectStageDistribution: { idea: Number, prototype: Number, pilot: Number, marketEntry: Number, scaling: Number, total: Number },
+    workforceDistribution: { '0_5': Number, '5_10': Number, '10_20': Number, '20_plus': Number, total: Number },
+    blockingFactorsCount: { type: Map, of: Number },
+    interventionsCount: { type: Map, of: Number }
+  },
   
   // Timestamps
   createdAt: { type: Date, default: Date.now },

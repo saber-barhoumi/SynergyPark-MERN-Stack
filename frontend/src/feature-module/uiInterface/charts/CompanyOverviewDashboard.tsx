@@ -243,7 +243,7 @@ const CompanyOverviewDashboard = () => {
           <div className="page-header">
             <div className="row">
               <div className="col-sm-12">
-                <h3 className="page-title">Company Overview Dashboard</h3>
+                <h3 className="page-title">Tableau de Bord - Vue d'ensemble des Entreprises</h3>
               </div>
             </div>
           </div>
@@ -252,9 +252,9 @@ const CompanyOverviewDashboard = () => {
               <div className="card">
                 <div className="card-body text-center">
                   <div className="spinner-border" role="status">
-                    <span className="visually-hidden">Loading...</span>
+                    <span className="visually-hidden">Chargement...</span>
                   </div>
-                  <p className="mt-3">Loading analytics data...</p>
+                  <p className="mt-3">Chargement des données analytiques...</p>
                 </div>
               </div>
             </div>
@@ -271,7 +271,7 @@ const CompanyOverviewDashboard = () => {
           <div className="page-header">
             <div className="row">
               <div className="col-sm-12">
-                <h3 className="page-title">Company Overview Dashboard</h3>
+                <h3 className="page-title">Tableau de Bord - Vue d'ensemble des Entreprises</h3>
               </div>
             </div>
           </div>
@@ -298,8 +298,8 @@ const CompanyOverviewDashboard = () => {
         <div className="page-header">
           <div className="row">
             <div className="col-sm-12">
-              <h3 className="page-title">Company Overview Dashboard</h3>
-              <p className="text-muted">Analytics and insights for all companies</p>
+              <h3 className="page-title">Tableau de Bord - Vue d'ensemble des Entreprises</h3>
+              <p className="text-muted">Analytique et indicateurs pour toutes les entreprises</p>
             </div>
           </div>
         </div>
@@ -312,7 +312,7 @@ const CompanyOverviewDashboard = () => {
                 <div className="d-flex justify-content-between">
                   <div>
                     <h4 className="mb-0">{profiles.length}</h4>
-                    <p className="mb-0">Total Companies</p>
+                    <p className="mb-0">Entreprises au total</p>
                   </div>
                   <div className="align-self-center">
                     <i className="fas fa-building fa-2x"></i>
@@ -327,7 +327,7 @@ const CompanyOverviewDashboard = () => {
                 <div className="d-flex justify-content-between">
                   <div>
                     <h4 className="mb-0">{profiles.filter(p => p.requestStatus === 'APPROVED').length}</h4>
-                    <p className="mb-0">Approved</p>
+                    <p className="mb-0">Approuvées</p>
                   </div>
                   <div className="align-self-center">
                     <i className="fas fa-check-circle fa-2x"></i>
@@ -342,7 +342,7 @@ const CompanyOverviewDashboard = () => {
                 <div className="d-flex justify-content-between">
                   <div>
                     <h4 className="mb-0">{profiles.filter(p => p.requestStatus === 'PENDING').length}</h4>
-                    <p className="mb-0">Pending</p>
+                    <p className="mb-0">En attente</p>
                   </div>
                   <div className="align-self-center">
                     <i className="fas fa-clock fa-2x"></i>
@@ -357,7 +357,7 @@ const CompanyOverviewDashboard = () => {
                 <div className="d-flex justify-content-between">
                   <div>
                     <h4 className="mb-0">{profiles.filter(p => p.requestStatus === 'REJECTED').length}</h4>
-                    <p className="mb-0">Rejected</p>
+                    <p className="mb-0">Rejetées</p>
                   </div>
                   <div className="align-self-center">
                     <i className="fas fa-times-circle fa-2x"></i>
@@ -374,10 +374,10 @@ const CompanyOverviewDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.activityDomain}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Activity Domain Distribution</h5>
+                <h5 className="card-title mb-0">Répartition par Domaine d'Activité</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.activityDomain, 'activity-domain-distribution')}
+                  onClick={() => downloadChart(chartRefs.activityDomain, 'repartition-domaine-activite')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
@@ -391,7 +391,7 @@ const CompanyOverviewDashboard = () => {
                       maintainAspectRatio: false,
                       plugins: {
                         legend: { position: 'bottom' },
-                        title: { display: true, text: 'Companies by Activity Domain' }
+                        title: { display: true, text: "Entreprises par Domaine d'Activité" }
                       }
                     }}
                   />
@@ -404,10 +404,10 @@ const CompanyOverviewDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.projectProgress}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Project Progress Status</h5>
+                <h5 className="card-title mb-0">Statut d'Avancement du Projet</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.projectProgress, 'project-progress-status')}
+                  onClick={() => downloadChart(chartRefs.projectProgress, 'statut-avancement-projet')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
@@ -421,7 +421,7 @@ const CompanyOverviewDashboard = () => {
                       maintainAspectRatio: false,
                       plugins: {
                         legend: { position: 'bottom' },
-                        title: { display: true, text: 'Companies by Project Progress' }
+                        title: { display: true, text: 'Entreprises par Avancement du Projet' }
                       }
                     }}
                   />
@@ -437,10 +437,10 @@ const CompanyOverviewDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.staffRange}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Staff Range Distribution</h5>
+                <h5 className="card-title mb-0">Répartition par Taille d'Équipe</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.staffRange, 'staff-range-distribution')}
+                  onClick={() => downloadChart(chartRefs.staffRange, 'repartition-taille-equipe')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
@@ -454,7 +454,7 @@ const CompanyOverviewDashboard = () => {
                       maintainAspectRatio: false,
                       plugins: {
                         legend: { display: false },
-                        title: { display: true, text: 'Companies by Staff Size' }
+                        title: { display: true, text: 'Entreprises par Taille d’Équipe' }
                       },
                       scales: {
                         y: { beginAtZero: true }
@@ -470,17 +470,20 @@ const CompanyOverviewDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.approvalRate}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Approval Rate Overview</h5>
+                <h5 className="card-title mb-0">Vue d'Ensemble des Statuts</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.approvalRate, 'approval-rate-overview')}
+                  onClick={() => downloadChart(chartRefs.approvalRate, 'vue-ensemble-statuts')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
               </div>
               <div className="card-body">
                 <ReactApexChart
-                  options={approvalRateData.options}
+                  options={{
+                    ...approvalRateData.options,
+                    labels: ['Approuvées', 'En attente', 'Rejetées'],
+                  }}
                   series={approvalRateData.series}
                   type="radialBar"
                   height={300}
@@ -496,17 +499,23 @@ const CompanyOverviewDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.revenueTrend}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Revenue Growth Trend</h5>
+                <h5 className="card-title mb-0">Tendance de Croissance du Chiffre d'Affaires</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.revenueTrend, 'revenue-growth-trend')}
+                  onClick={() => downloadChart(chartRefs.revenueTrend, 'tendance-croissance-chiffre-affaires')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
               </div>
               <div className="card-body">
                 <ReactApexChart
-                  options={revenueTrendData.options}
+                  options={{
+                    ...revenueTrendData.options,
+                    xaxis: {
+                      ...revenueTrendData.options.xaxis,
+                      categories: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep']
+                    },
+                  }}
                   series={revenueTrendData.series}
                   type="line"
                   height={300}
@@ -519,10 +528,10 @@ const CompanyOverviewDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.stackedDomain}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Domain Status Stacked</h5>
+                <h5 className="card-title mb-0">Statut par Domaine (Empilé)</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.stackedDomain, 'domain-status-stacked')}
+                  onClick={() => downloadChart(chartRefs.stackedDomain, 'statut-par-domaine-empile')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
@@ -535,7 +544,7 @@ const CompanyOverviewDashboard = () => {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                      title: { display: true, text: 'Companies by Domain and Status' }
+                      title: { display: true, text: 'Entreprises par Domaine et Statut' }
                     },
                     scales: {
                       x: { stacked: true },
@@ -554,10 +563,10 @@ const CompanyOverviewDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.supportNeeded}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Support Needs Distribution</h5>
+                <h5 className="card-title mb-0">Répartition des Besoins en Support</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
-                  onClick={() => downloadChart(chartRefs.supportNeeded, 'support-needs-distribution')}
+                  onClick={() => downloadChart(chartRefs.supportNeeded, 'repartition-besoins-support')}
                 >
                   <i className="fas fa-download"></i>
                 </button>
@@ -571,7 +580,7 @@ const CompanyOverviewDashboard = () => {
                     maintainAspectRatio: false,
                     plugins: {
                       legend: { position: 'bottom' },
-                      title: { display: true, text: 'Companies by Support Needs' }
+                      title: { display: true, text: 'Entreprises par Besoins en Support' }
                     }
                   }}
                   style={{ height: '300px' }}
@@ -584,16 +593,16 @@ const CompanyOverviewDashboard = () => {
           <div className="col-md-6">
             <div className="card">
               <div className="card-header">
-                <h5 className="card-title mb-0">All Companies - Click to View Details</h5>
+                <h5 className="card-title mb-0">Toutes les Entreprises - Cliquez pour voir les détails</h5>
               </div>
               <div className="card-body">
                 <div className="table-responsive" style={{ maxHeight: '300px', overflowY: 'auto' }}>
                   <table className="table table-hover">
                     <thead>
                       <tr>
-                        <th>Company Name</th>
-                        <th>Domain</th>
-                        <th>Status</th>
+                        <th>Nom de l'Entreprise</th>
+                        <th>Domaine</th>
+                        <th>Statut</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -607,7 +616,7 @@ const CompanyOverviewDashboard = () => {
                               profile.requestStatus === 'APPROVED' ? 'success' : 
                               profile.requestStatus === 'REJECTED' ? 'danger' : 'warning'
                             }`}>
-                              {profile.requestStatus || 'PENDING'}
+                              {profile.requestStatus === 'APPROVED' ? 'Approuvée' : profile.requestStatus === 'REJECTED' ? 'Rejetée' : 'En attente'}
                             </span>
                           </td>
                           <td>
@@ -615,7 +624,7 @@ const CompanyOverviewDashboard = () => {
                               to={`/company-detail-dashboard/${profile._id}`}
                               className="btn btn-sm btn-primary"
                             >
-                              <i className="fas fa-eye me-1"></i>View
+                              <i className="fas fa-eye me-1"></i>Voir
                             </Link>
                           </td>
                         </tr>
@@ -625,7 +634,7 @@ const CompanyOverviewDashboard = () => {
                 </div>
                 {profiles.length > 10 && (
                   <div className="text-center mt-3">
-                    <small className="text-muted">Showing first 10 of {profiles.length} companies</small>
+                    <small className="text-muted">Affichage des 10 premières entreprises sur {profiles.length}</small>
                   </div>
                 )}
               </div>

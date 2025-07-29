@@ -1,359 +1,181 @@
 // src/hooks/useCompanyProfile.tsx
-import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useState, useEffect, useCallback } from 'react';
+import companyProfileService from '../services/companyProfileService';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-// Type definitions
-interface User {
-  id?: string;
-  userId?: string;
-  _id?: string;
-  username?: string;
-  email?: string;
-  firstName?: string;
-  lastName?: string;
-  role: string;
-}
-
+// Types pour les nouveaux indicateurs
 interface CompanyProfile {
   _id?: string;
   userId: string;
-  
-  // Basic Information
   consentGiven: boolean;
   companyName: string;
   founderName: string;
   email: string;
-  phone?: string;
   companyCreationDate: string;
-  
-  // Activity & Domain
   activityDomain: string;
   activitySubDomain?: string;
-  
-  // Project & Progress
   projectProgress: string;
-  stage?: string;
-  
-  // Staff & Organization
   staffRange: string;
-  staffPositions?: string;
-  
-  // Approval & Status
-  approval?: boolean;
-  requestStatus?: string;
-  responseDate?: string;
-  
-  // Labeling & Classification
-  isLabeled?: boolean;
-  labelType?: string;
-  
-  // Challenges & Barriers
-  barriers?: string;
-  otherBarriers?: string;
-  
-  // Support & Recommendations
-  supportNeeded?: string;
-  supportNeededOther?: string;
-  recommendations?: string;
-  
-  // Company Identity
-  slogan?: string;
-  logo?: string;
-  
-  // Business Information
-  businessPlanSummary?: string;
-  marketAnalysis?: string;
-  targetMarket?: string;
-  competitors?: string;
-  competitiveAdvantage?: string;
-  riskFactors?: string;
-  
-  // Recognition & Values
-  awards?: string;
-  values?: string;
-  
-  // Additional Information
-  longDescription?: string;
-  website?: string;
   address?: string;
-  
-  // Timestamps
+  requestStatus: string;
   createdAt?: string;
   updatedAt?: string;
-}
-
-interface ProfileData {
-  isStartup: boolean;
-  hasProfile: boolean;
-  isProfileComplete: boolean;
-  profile: CompanyProfile | null;
-}
-
-interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data: T;
-}
-
-interface EnumData {
-  ActivityDomain: Record<string, string>;
-  ActivitySubDomain: Record<string, string>;
-  ProjectProgress: Record<string, string>;
-  StaffRange: Record<string, string>;
-  RequestStatus: Record<string, string>;
-  CompanyStage: Record<string, string>;
-  LabelType: Record<string, string>;
-  SupportNeeded: Record<string, string>;
-}
-
-interface CompanyProfileFormData {
-  // Basic Information
-  consentGiven: boolean;
-  companyName: string;
-  founderName: string;
-  email: string;
-  phone?: string;
-  companyCreationDate: string;
   
-  // Activity & Domain
-  activityDomain: string;
-  activitySubDomain?: string;
+  // --- NOUVEAUX INDICATEURS ---
+  gender: 'MALE' | 'FEMALE' | 'OTHER';
+  sectors: string[];
+  qualityCertification: boolean;
+  certificationDetails?: string;
+  projectStage: 'IDEA' | 'PROTOTYPE' | 'PILOT' | 'MARKET_ENTRY' | 'SCALING';
+  workforce: number;
+  blockingFactors: string[];
+  interventionsNeeded: string[];
+  projectNotes?: string;
   
-  // Project & Progress
-  projectProgress: string;
-  stage?: string;
-  
-  // Staff & Organization
-  staffRange: string;
-  staffPositions?: string;
-  
-  // Approval & Status
-  approval?: boolean;
-  requestStatus?: string;
-  
-  // Labeling & Classification
-  isLabeled?: boolean;
-  labelType?: string;
-  
-  // Challenges & Barriers
-  barriers?: string;
-  otherBarriers?: string;
-  
-  // Support & Recommendations
-  supportNeeded?: string;
-  supportNeededOther?: string;
-  recommendations?: string;
-  
-  // Company Identity
-  slogan?: string;
-  logo?: string;
-  
-  // Business Information
-  businessPlanSummary?: string;
-  marketAnalysis?: string;
-  targetMarket?: string;
-  competitors?: string;
-  competitiveAdvantage?: string;
-  riskFactors?: string;
-  
-  // Recognition & Values
-  awards?: string;
-  values?: string;
-  
-  // Additional Information
-  longDescription?: string;
-  website?: string;
-  address?: string;
+  // --- STATISTIQUES CALCULÉES ---
+  statistics?: {
+    genderDistribution: { male: number; female: number; other: number };
+    sectorDistribution: { [key: string]: number };
+    certificationRate: number;
+    projectStageDistribution: { [key: string]: number };
+    workforceDistribution: { [key: string]: number };
+    blockingFactorsAnalysis: { [key: string]: number };
+    interventionsAnalysis: { [key: string]: number };
+  };
 }
 
 interface UseCompanyProfileReturn {
-  profileData: ProfileData | null;
+  // Données
+  companyProfile: CompanyProfile | null;
+  statistics: any;
   loading: boolean;
   error: string | null;
-  shouldShowModal: boolean;
-  refreshProfileData: () => void;
-  createOrUpdateProfile: (profileData: CompanyProfileFormData) => Promise<{ success: boolean; data: CompanyProfile }>;
-  getEnums: () => Promise<EnumData>;
-  checkProfileCompletion: () => Promise<void>;
+  
+  // Actions
+  createOrUpdateProfile: (data: Partial<CompanyProfile>) => Promise<boolean>;
+  fetchProfile: () => Promise<void>;
+  fetchStatistics: () => Promise<void>;
+  downloadPDFReport: (companyId: string) => Promise<void>;
+  
+  // États
+  isCreating: boolean;
+  isUpdating: boolean;
+  isDownloading: boolean;
 }
 
-export const useCompanyProfile = (): UseCompanyProfileReturn => {
-  const { user, isAuthenticated } = useAuth();
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+export const useCompanyProfile = (userId?: string): UseCompanyProfileReturn => {
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
+  const [statistics, setStatistics] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [shouldShowModal, setShouldShowModal] = useState<boolean>(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  const checkProfileCompletion = async (): Promise<void> => {
-    // Check for user ID in multiple possible properties
-    const userId = user?.userId || user?.id || user?._id;
-    
-    if (!userId || !isAuthenticated) {
-      console.log('[useCompanyProfile] No user ID or not authenticated');
-      console.log('[useCompanyProfile] User object:', user);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
+  // Récupérer le profil de l'entreprise
+  const fetchProfile = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      console.log('[useCompanyProfile] Checking profile for user:', userId);
-      console.log('[useCompanyProfile] User object keys:', Object.keys(user || {}));
-      
-      const response = await fetch(`${API_URL}/api/company-profile/check/${userId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        // Get more detailed error information
-        let errorMessage: string;
-        try {
-          const errorData: ApiResponse<any> = await response.json();
-          errorMessage = errorData.message || `HTTP error! status: ${response.status}`;
-        } catch {
-          errorMessage = `HTTP error! status: ${response.status}`;
-        }
-        console.error('[useCompanyProfile] HTTP Error:', response.status, errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      const data: ApiResponse<ProfileData> = await response.json();
-      console.log('[useCompanyProfile] Profile check response:', data);
-
-      if (data.success) {
-        setProfileData(data.data);
-        
-        // Show modal if user is STARTUP and profile is incomplete
-        const shouldShow = data.data.isStartup && !data.data.isProfileComplete;
-        setShouldShowModal(shouldShow);
-        
-        console.log('[useCompanyProfile] Should show modal:', shouldShow);
+      setLoading(true);
+      setError(null);
+      const response = await companyProfileService.getCompanyProfile(userId!);
+      if (response.success) {
+        setCompanyProfile(response.data);
       } else {
-        throw new Error(data.message || 'Failed to check profile completion');
+        setError(response.message || 'Échec de la récupération du profil');
       }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-      console.error('[useCompanyProfile] Error checking profile:', err);
-      setError(errorMessage);
-      setShouldShowModal(false);
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la récupération du profil');
     } finally {
       setLoading(false);
     }
+  }, [userId]);
+
+  // Récupérer les statistiques
+  const fetchStatistics = async () => {
+    try {
+      const response = await companyProfileService.getStatistics();
+      if (response.success) {
+        setStatistics(response.data);
+      }
+    } catch (err: any) {
+      console.error('Erreur lors de la récupération des statistiques:', err);
+    }
   };
 
-  const refreshProfileData = (): void => {
-    console.log('[useCompanyProfile] Refreshing profile data');
-    checkProfileCompletion();
-  };
-
-  const createOrUpdateProfile = async (profileData: CompanyProfileFormData): Promise<{ success: boolean; data: CompanyProfile }> => {
-    const userId = user?.userId || user?.id || user?._id;
-    
-    if (!userId || !isAuthenticated) {
-      throw new Error('User not authenticated');
+  // Créer ou mettre à jour le profil
+  const createOrUpdateProfile = async (data: Partial<CompanyProfile>): Promise<boolean> => {
+    if (!userId) {
+      setError('ID utilisateur requis pour créer/mettre à jour le profil');
+      return false;
     }
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
+    const isUpdate = !!companyProfile?._id;
+    setIsCreating(!isUpdate);
+    setIsUpdating(isUpdate);
+    setError(null);
 
     try {
-      console.log('[useCompanyProfile] Creating/updating profile:', profileData);
+      let response;
       
-      const response = await fetch(`${API_URL}/api/company-profile/${userId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(profileData)
-      });
-
-      const data: ApiResponse<CompanyProfile> = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
-      }
-
-      if (data.success) {
-        console.log('[useCompanyProfile] Profile saved successfully');
-        // Refresh profile data after successful save
-        await checkProfileCompletion();
-        return { success: true, data: data.data };
+      if (isUpdate) {
+        response = await companyProfileService.updateCompanyProfile(userId, data);
       } else {
-        throw new Error(data.message || 'Failed to save profile');
+        response = await companyProfileService.createCompanyProfile({ ...data, userId });
       }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-      console.error('[useCompanyProfile] Error saving profile:', err);
-      throw new Error(errorMessage);
+
+      if (response.success) {
+        setCompanyProfile(response.data);
+        return true;
+      } else {
+        setError(response.message || `Échec de la ${isUpdate ? 'mise à jour' : 'création'} du profil`);
+        return false;
+      }
+    } catch (err: any) {
+      setError(err.message || `Erreur lors de la ${isUpdate ? 'mise à jour' : 'création'} du profil`);
+      return false;
+    } finally {
+      setIsCreating(false);
+      setIsUpdating(false);
     }
   };
 
-  const getEnums = async (): Promise<EnumData> => {
+  // Télécharger le rapport PDF
+  const downloadPDFReport = async (companyId: string) => {
+    setIsDownloading(true);
+    setError(null);
+
     try {
-      const response = await fetch(`${API_URL}/api/company-profile/enums`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data: ApiResponse<EnumData> = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
-      }
-
-      if (data.success) {
-        return data.data;
+      const response = await companyProfileService.downloadPDFReport(companyId);
+      if (response.success) {
+        // Le téléchargement est géré par le service
+        console.log('Rapport PDF téléchargé avec succès');
       } else {
-        throw new Error(data.message || 'Failed to fetch enums');
+        setError(response.message || 'Échec du téléchargement du rapport');
       }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-      console.error('[useCompanyProfile] Error fetching enums:', err);
-      throw new Error(errorMessage);
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du téléchargement du rapport');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
-  // Check profile completion when user changes or component mounts
+  // Charger le profil au montage du composant
   useEffect(() => {
-    const userId = user?.userId || user?.id || user?._id;
-    
-    if (userId && isAuthenticated) {
-      console.log('[useCompanyProfile] User authenticated, checking profile completion');
-      checkProfileCompletion();
-    } else {
-      console.log('[useCompanyProfile] User not authenticated, clearing state');
-      setProfileData(null);
-      setShouldShowModal(false);
-      setError(null);
+    if (userId) {
+      fetchProfile();
     }
-    // Dependencies should include all possible user ID properties
-  }, [user?.userId, user?.id, user?._id, isAuthenticated]);
+  }, [userId, fetchProfile]);
 
   return {
-    profileData,
+    companyProfile,
+    statistics,
     loading,
     error,
-    shouldShowModal,
-    refreshProfileData,
     createOrUpdateProfile,
-    getEnums,
-    checkProfileCompletion
+    fetchProfile,
+    fetchStatistics,
+    downloadPDFReport,
+    isCreating,
+    isUpdating,
+    isDownloading,
   };
 };
