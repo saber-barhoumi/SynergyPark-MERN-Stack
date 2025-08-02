@@ -213,7 +213,7 @@ const CompanyDetailDashboard = () => {
       projectStageData: {
         labels: ['Idée', 'Prototype', 'Pilote', 'Entrée Marché', 'Mise à l\'Échelle'],
         datasets: [{
-          label: 'Étape du Projet',
+          label: 'Les postes existants dans les startups',
           data: [0, 0, 0, 0, 0],
           backgroundColor: '#42A5F5',
           borderColor: '#42A5F5',
@@ -223,7 +223,7 @@ const CompanyDetailDashboard = () => {
       workforceData: {
         labels: ['0-5', '5-10', '10-20', '20+'],
         datasets: [{
-          label: 'Répartition de l\'Effectif',
+          label: 'Les postes existants dans les startups',
           data: [0, 0, 0, 0],
           backgroundColor: '#FFEB3B',
           borderColor: '#FFEB3B',
@@ -277,7 +277,7 @@ const CompanyDetailDashboard = () => {
     const projectStageData = {
       labels: ['Idée', 'Prototype', 'Pilote', 'Entrée Marché', 'Mise à l\'Échelle'],
       datasets: [{
-        label: 'Étape du Projet',
+        label: 'Les postes existants dans les startups',
         data: [
           companyProfile.projectStage === 'IDEA' ? 1 : 0,
           companyProfile.projectStage === 'PROTOTYPE' ? 1 : 0,
@@ -437,7 +437,7 @@ const CompanyDetailDashboard = () => {
                 <div className="d-flex justify-content-between">
                   <div>
                     <h4 className="mb-0">{companyProfile?.projectProgress || 'Non spécifié'}</h4>
-                    <p className="mb-0">Avancement du Projet</p>
+                    <p className="mb-0">Les postes existants dans les startups</p>
                   </div>
                   <div className="align-self-center">
                     <i className="fas fa-chart-line fa-2x"></i>
@@ -484,7 +484,7 @@ const CompanyDetailDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.genderDistribution}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Répartition par Genre</h5>
+                <h5 className="card-title mb-0">Répartition des startups par genre H / F</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
                   onClick={() => downloadChart(chartRefs.genderDistribution, 'repartition-genre')}
@@ -527,7 +527,7 @@ const CompanyDetailDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.sectorAnalysis}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Analyse Sectorielle</h5>
+                <h5 className="card-title mb-0">Domaines D'activités</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
                   onClick={() => downloadChart(chartRefs.sectorAnalysis, 'analyse-sectorielle')}
@@ -619,7 +619,7 @@ const CompanyDetailDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.projectStageDistribution}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Répartition par Étape de Projet</h5>
+                <h5 className="card-title mb-0">Les postes existants dans les startups</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
                   onClick={() => downloadChart(chartRefs.projectStageDistribution, 'repartition-etapes')}
@@ -647,7 +647,7 @@ const CompanyDetailDashboard = () => {
                 <div className="mt-3">
                   <h6>Analyse:</h6>
                   <p className="text-muted">
-                    La répartition par étape de projet révèle la santé de notre pipeline et l'efficacité du support 
+                    La Les postes existants dans les startups révèle la santé de notre pipeline et l'efficacité du support 
                     à différentes phases de développement. Une répartition équilibrée indique un flux de projets sain.
                   </p>
                   <h6>Recommandations:</h6>
@@ -668,7 +668,7 @@ const CompanyDetailDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.workforceAnalysis}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Analyse de l'Effectif</h5>
+                <h5 className="card-title mb-0">Analyse d'effectif existant dans les Startups</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
                   onClick={() => downloadChart(chartRefs.workforceAnalysis, 'analyse-effectif')}
@@ -714,7 +714,7 @@ const CompanyDetailDashboard = () => {
           <div className="col-md-6">
             <div className="card" ref={chartRefs.blockingFactors}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Facteurs de Blocage</h5>
+                <h5 className="card-title mb-0">Les facteurs qui ont été un obstacle au développement du produit</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
                   onClick={() => downloadChart(chartRefs.blockingFactors, 'facteurs-blocage')}
@@ -727,7 +727,7 @@ const CompanyDetailDashboard = () => {
                   <table className="table table-striped">
                     <thead>
                       <tr>
-                        <th>Facteur de Blocage</th>
+                        <th>Les facteurs qui ont été un obstacle au développement du produit</th>
                         <th>Description</th>
                         <th>Impact</th>
                       </tr>
@@ -774,7 +774,7 @@ const CompanyDetailDashboard = () => {
           <div className="col-md-12">
             <div className="card" ref={chartRefs.interventionsNeeded}>
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="card-title mb-0">Interventions Requises</h5>
+                <h5 className="card-title mb-0">Les formes d'intervention jugées les plus utiles pour soutenir le processus d'incubation de la S2T</h5>
                 <button 
                   className="btn btn-sm btn-outline-primary"
                   onClick={() => downloadChart(chartRefs.interventionsNeeded, 'interventions-requises')}
@@ -882,7 +882,7 @@ const CompanyDetailDashboard = () => {
                           </td>
                         </tr>
                         <tr>
-                          <td><strong>Étape du Projet:</strong></td>
+                          <td><strong>Les postes existants dans les startups:</strong></td>
                           <td>
                             {companyProfile?.projectStage === 'IDEA' ? 'Idée' :
                              companyProfile?.projectStage === 'PROTOTYPE' ? 'Prototype' :
@@ -903,7 +903,7 @@ const CompanyDetailDashboard = () => {
                         </tr>
                         <tr>
                           <td><strong>Effectif:</strong></td>
-                          <td>{companyProfile?.workforce || 'Non spécifié'} employés</td>
+                          <td>{companyProfile?.workforce || 'Non spécifié'} Les postes existants dans les startups</td>
                         </tr>
                         <tr>
                           <td><strong>Certification Qualité:</strong></td>

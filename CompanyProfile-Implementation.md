@@ -26,7 +26,7 @@ This implementation adds mandatory CompanyProfile completion for STARTUP users a
 
 ## Frontend Implementation
 
-### 1. Modal Component (`frontend/src/feature-module/modals/companyProfileModal.tsx`)
+### 1. Modal Component (`frontend/src/feature-module/modals/companyProfileModal`)
 - **Form Fields**: All required and optional company profile fields
 - **Validation**: Client-side validation with required field indicators
 - **API Integration**: Saves profile data to backend
