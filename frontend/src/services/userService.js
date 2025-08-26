@@ -126,7 +126,7 @@ class UserService {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`${API_URL}/api/users`, {
+      const response = await fetch(`${API_URL}/api/user`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

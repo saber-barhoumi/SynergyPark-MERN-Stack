@@ -1,13 +1,42 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import ImageWithBasePath from '../../../core/common/imageWithBasePath'
 import { all_routes } from '../../router/all_routes'
 import CommonTabs from '../common-components'
 import CollapseHeader from '../../../core/common/collapse-header/collapse-header'
 import CrmsModal from '../../../core/modals/crms_modal'
+import { useAuth } from '../../../contexts/AuthContext'
+import ChatModule from '../chat/ChatModule'
+import ChatButton from '../chat/ChatButton'
 
 const ContactDetails = () => {
   const routes = all_routes
+  const { user: currentUser } = useAuth()
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [selectedChatUser, setSelectedChatUser] = useState(null)
+  
+  // Mock contact data - in real app this would come from props or API
+  const contactUser = {
+    _id: 'contact-user-id',
+    firstName: 'Darlee',
+    lastName: 'Robertson',
+    email: 'darlee@example.com',
+    phone: '(163) 2459 315',
+    avatar: 'assets/img/profiles/avatar-19.jpg',
+    role: 'Facility Manager'
+  }
+
+  const handleChatOpen = (user: any) => {
+    setSelectedChatUser(user)
+    setIsChatOpen(true)
+  }
+
+  const handleChatClose = () => {
+    setIsChatOpen(false)
+    setSelectedChatUser(null)
+  }
+
+  const token = localStorage.getItem('token') || null
   return (
     <>
     <div className="page-wrapper">
@@ -224,6 +253,16 @@ const ContactDetails = () => {
                   <ImageWithBasePath src="assets/img/social/social-05.svg" alt="Img" />
                 </Link>
               </div>
+              <div className="row gx-2 mb-3">
+                <div className="col-12">
+                  <ChatButton 
+                    user={contactUser}
+                    currentUser={currentUser}
+                    token={token}
+                    onChatOpen={handleChatOpen}
+                  />
+                </div>
+              </div>
               <div className="row gx-2">
                 <div className="col-6">
                   <Link
@@ -261,6 +300,16 @@ const ContactDetails = () => {
     </p>
   </div>
 </div>
+
+{/* Chat Module */}
+<ChatModule
+  isOpen={isChatOpen}
+  onClose={handleChatClose}
+  selectedUser={selectedChatUser}
+  currentUser={currentUser}
+  token={token}
+/>
+
 <CrmsModal/>
 </>
   )
