@@ -333,7 +333,7 @@ router.post('/forgot-password', userController.forgotPassword);
 router.post('/reset-password', userController.resetPassword);
 
 // ✅ Verify Reset Token Route
-router.get('/verify-reset-token', (req, res) => {
+router.get('/verify-reset-token', async (req, res) => {
   try {
     const { token } = req.query;
 
@@ -344,25 +344,28 @@ router.get('/verify-reset-token', (req, res) => {
       });
     }
 
-    const resetData = resetTokens.get(token);
-    if (!resetData) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid reset token'
-      });
-    }
+    // Look for a user with this reset token
+    const crypto = require('crypto');
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
 
-    if (Date.now() > resetData.expiry) {
-      resetTokens.delete(token);
+    if (!user) {
       return res.status(400).json({
         success: false,
-        message: 'Reset token has expired'
+        message: 'Invalid or expired reset token'
       });
     }
 
     res.json({
       success: true,
-      message: 'Reset token is valid'
+      message: 'Reset token is valid',
+      data: {
+        email: user.email // Return email for verification
+      }
     });
 
   } catch (err) {
@@ -371,6 +374,40 @@ router.get('/verify-reset-token', (req, res) => {
       success: false,
       message: 'Failed to verify reset token'
     });
+  }
+});
+
+// ✅ Development: Get reset token for testing (remove in production)
+router.post('/dev-get-reset-token', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ message: 'Not found' });
+  }
+  
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+    
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    const resetToken = user.generateResetToken();
+    await user.save();
+    
+    res.json({
+      success: true,
+      message: 'Development reset token generated',
+      resetToken,
+      resetLink: `http://localhost:3000/reset-password?token=${resetToken}`,
+      expiresAt: new Date(user.resetPasswordExpires)
+    });
+    
+  } catch (err) {
+    console.error('Dev reset token error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
