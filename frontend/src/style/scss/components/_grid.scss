@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 .grid-showcase {
   margin-bottom: -10px;
   span, .grid-wrapper {
@@ -20,4 +21,28 @@
   min-height: 150px;
   padding: 10px;
   color: $black;
+=======
+.grid-showcase {
+  margin-bottom: -10px;
+  span, .grid-wrapper {
+    display: block;
+    padding: 10px;
+    margin-bottom: 10px;
+    text-align: center;
+    background-color: rgba(242, 243, 247, 0.7);
+  }
+}
+.grid-align {
+  margin-bottom: -16px;
+}
+.grid-align .row {
+  padding: 15px 0;
+  min-height: 7rem;
+  margin-bottom: 16px;
+}
+.grid-vertical {
+  min-height: 150px;
+  padding: 10px;
+  color: $black;
+>>>>>>> khalil
 }

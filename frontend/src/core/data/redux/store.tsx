@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { configureStore } from '@reduxjs/toolkit';
 import themeSettingSlice from './themeSettingSlice';
 import sidebarSlice from './sidebarSlice';
@@ -11,3 +12,18 @@ const store = configureStore({
 });
 
 export default store;
+=======
+import { configureStore } from '@reduxjs/toolkit';
+import themeSettingSlice from './themeSettingSlice';
+import sidebarSlice from './sidebarSlice';
+
+
+const store = configureStore({
+  reducer: {
+    themeSetting: themeSettingSlice,
+    sidebarSlice: sidebarSlice,
+  },
+});
+
+export default store;
+>>>>>>> khalil

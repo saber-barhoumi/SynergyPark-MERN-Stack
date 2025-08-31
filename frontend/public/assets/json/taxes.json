@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "data" : [
     {
@@ -23,3 +24,30 @@
   ],
   "totalData": 4
 }
+=======
+{
+  "data" : [
+    {
+      "Tax_Name": "VAT",
+      "Tax_Percentage": "20%",
+      "Status": "Active"
+    },
+    {
+      "Tax_Name": "GST",
+      "Tax_Percentage": "18%",
+      "Status": "Active"
+    },
+    {
+      "Tax_Name": "Income Tax",
+      "Tax_Percentage": "30%",
+      "Status": "Inactive"
+    },
+    {
+      "Tax_Name": "Corporate Tax",
+      "Tax_Percentage": "25%",
+      "Status": "Inactive"
+    }
+  ],
+  "totalData": 4
+}
+>>>>>>> khalil
