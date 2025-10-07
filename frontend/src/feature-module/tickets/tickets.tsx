@@ -1,13 +1,199 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { all_routes } from "../router/all_routes";
 import ImageWithBasePath from "../../core/common/imageWithBasePath";
 import ReactApexChart from "react-apexcharts";
 import TicketListModal from "../../core/modals/ticketListModal";
 import CollapseHeader from "../../core/common/collapse-header/collapse-header";
+import ticketService from "../../services/ticketService";
+import { useAuth } from "../../contexts/AuthContext";
+import TicketFilters from "../../core/common/TicketFilters";
+
+interface Ticket {
+  _id: string;
+  title: string;
+  description: string;
+  category: string;
+  priority: string;
+  impact: string;
+  status: string;
+  contactEmail: string;
+  companyName: string;
+  createdAt: string;
+  updatedAt: string;
+  reportedBy?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  assignedTo?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  comments?: any[];
+}
+
+interface FilterOptions {
+  priority: string;
+  status: string;
+  sortBy: string;
+  sortOrder: string;
+  search: string;
+}
 
 const Tickets = () => {
   const routes = all_routes;
+  const { user } = useAuth();
+  
+  // États pour les tickets
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+  const [filters, setFilters] = useState<FilterOptions>({
+    priority: '',
+    status: '',
+    sortBy: 'createdAt',
+    sortOrder: 'desc',
+    search: ''
+  });
+  const [statistics, setStatistics] = useState({
+    totalTickets: 0,
+    openTickets: 0,
+    resolvedTickets: 0,
+    pendingTickets: 0,
+    growthPercentages: {
+      totalTickets: 0,
+      openTickets: 0,
+      resolvedTickets: 0
+    }
+  });
+
+  // Charger les tickets et statistiques
+  useEffect(() => {
+    loadTickets();
+    loadStatistics();
+  }, []);
+
+  useEffect(() => {
+    loadTickets();
+  }, [filters]);
+
+  const loadTickets = async () => {
+    try {
+      setLoading(true);
+      const response = await ticketService.getAllTickets({ ...filters, limit: 10 });
+      
+      if (response.success) {
+        setTickets(response.data);
+      } else {
+        setError('Erreur lors du chargement des tickets');
+      }
+    } catch (err: any) {
+      console.error('Erreur lors du chargement des tickets:', err);
+      setError(err.message || 'Erreur lors du chargement des tickets');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFiltersChange = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
+  };
+
+  const loadStatistics = async () => {
+    try {
+      const response = await ticketService.getTicketStatistics();
+      
+      if (response.success) {
+        const stats = response.data.overview;
+        setStatistics({
+          totalTickets: stats.totalTickets || 0,
+          openTickets: stats.openTickets || 0,
+          resolvedTickets: stats.resolvedTickets || 0,
+          pendingTickets: stats.inProgressTickets || 0,
+          growthPercentages: stats.growthPercentages || {
+            totalTickets: 0,
+            openTickets: 0,
+            resolvedTickets: 0
+          }
+        });
+      }
+    } catch (err: any) {
+      console.error('Erreur lors du chargement des statistiques:', err);
+    }
+  };
+
+  // Fonctions utilitaires pour l'affichage
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'URGENT': return 'danger';
+      case 'HIGH': return 'danger';
+      case 'MEDIUM': return 'warning';
+      case 'LOW': return 'success';
+      default: return 'secondary';
+    }
+  };
+
+  // Fonction pour formater les pourcentages
+  const formatPercentage = (percentage: number) => {
+    const sign = percentage >= 0 ? '+' : '';
+    return `${sign}${percentage.toFixed(1)}%`;
+  };
+
+  // Fonction pour obtenir l'icône de tendance
+  const getTrendIcon = (percentage: number) => {
+    return percentage >= 0 ? 'ti-trending-up' : 'ti-trending-down';
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'OPEN': return 'pink';
+      case 'IN_PROGRESS': return 'warning';
+      case 'PENDING': return 'info';
+      case 'RESOLVED': return 'success';
+      case 'CLOSED': return 'secondary';
+      default: return 'light';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'OPEN': return 'Open';
+      case 'IN_PROGRESS': return 'In Progress';
+      case 'PENDING': return 'On Hold';
+      case 'RESOLVED': return 'Resolved';
+      case 'CLOSED': return 'Closed';
+      default: return status;
+    }
+  };
+
+  const getCategoryLabel = (category: string) => {
+    const labels: Record<string, string> = {
+      'TECHNICAL': 'IT Support',
+      'BUSINESS': 'Business',
+      'LEGAL': 'Legal',
+      'FINANCIAL': 'Financial',
+      'MARKETING': 'Marketing',
+      'OPERATIONAL': 'Operational',
+      'HUMAN_RESOURCES': 'HR',
+      'OTHER': 'Other'
+    };
+    return labels[category] || category;
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${diffInHours} hours ago`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays} days ago`;
+  };
 
   const [Areachart] = useState<any>({
     series: [
@@ -387,17 +573,19 @@ const Tickets = () => {
                   </ul>
                 </div>
               </div>
-              <div className="mb-2">
-                <Link
-                  to="#"
-                  data-bs-toggle="modal"
-                  data-bs-target="#add_ticket"
-                  className="btn btn-primary d-flex align-items-center"
-                >
-                  <i className="ti ti-circle-plus me-2" />
-                  Add Ticket
-                </Link>
-              </div>
+              {user?.role === 'STARTUP' && (
+                <div className="mb-2">
+                  <Link
+                    to="#"
+                    data-bs-toggle="modal"
+                    data-bs-target="#add_ticket"
+                    className="btn btn-primary d-flex align-items-center"
+                  >
+                    <i className="ti ti-circle-plus me-2" />
+                    Add Ticket
+                  </Link>
+                </div>
+              )}
               <div className="head-icons ms-2">
                 <CollapseHeader />
               </div>
@@ -405,274 +593,233 @@ const Tickets = () => {
           </div>
           {/* /Breadcrumb */}
           <div className="row">
-            <div className="col-xl-3 col-md-6 d-flex">
-              <div className="card flex-fill">
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-6 d-flex">
-                      <div className="flex-fill">
-                        <div className="border border-dashed border-primary rounded-circle d-inline-flex align-items-center justify-content-center p-1 mb-3">
-                          <span className="avatar avatar-lg avatar-rounded bg-primary-transparent ">
-                            <i className="ti ti-ticket fs-20" />
-                          </span>
+            <div className="col-xl-4 col-md-6 d-flex">
+              <div className="card flex-fill shadow-sm border-0" style={{ 
+                background: 'linear-gradient(135deg, #ffffff 0%, #fff8f0 100%)',
+                borderRadius: '16px',
+                transition: 'all 0.3s ease',
+                border: '1px solid rgba(255, 193, 7, 0.1)'
+              }}>
+                <div className="card-body p-4">
+                  <div className="row align-items-center">
+                    <div className="col-6">
+                      <div className="d-flex flex-column">
+                        <div className="position-relative mb-3">
+                          <div className="d-inline-flex align-items-center justify-content-center" 
+                               style={{
+                                 width: '60px',
+                                 height: '60px',
+                                 background: 'linear-gradient(135deg, #ffc107 0%, #fd7e14 100%)',
+                                 borderRadius: '20px',
+                                 boxShadow: '0 8px 25px rgba(255, 193, 7, 0.3)',
+                                 position: 'relative'
+                               }}>
+                            <i className="ti ti-ticket fs-24 text-white" />
+                            <div className="position-absolute top-0 start-100 translate-middle" 
+                                 style={{
+                                   width: '12px',
+                                   height: '12px',
+                                   background: '#ffc107',
+                                   borderRadius: '50%',
+                                   border: '2px solid white',
+                                   boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                 }}></div>
+                          </div>
                         </div>
-                        <p className="fw-medium fs-12 mb-1">New Tickets</p>
-                        <h4>120</h4>
+                        <div>
+                          <p className="fw-semibold fs-13 mb-1 text-muted" style={{ letterSpacing: '0.5px' }}>
+                            New Tickets
+                          </p>
+                          <h3 className="fw-bold mb-0 text-warning" style={{ 
+                            fontSize: '2rem',
+                            textShadow: '0 2px 4px rgba(255, 193, 7, 0.1)'
+                          }}>
+                            {statistics.totalTickets}
+                          </h3>
+                        </div>
                       </div>
                     </div>
-                    <div className="col-6 text-end d-flex">
-                      <div className="d-flex flex-column justify-content-between align-items-end">
-                        <span className="badge bg-transparent-purple d-inline-flex align-items-center mb-3">
-                          <i className="ti ti-arrow-wave-right-down me-1" />
-                          +19.01%
-                        </span>
-                        <ReactApexChart
-                          options={Areachart}
-                          series={Areachart.series}
-                          type="bar"
-                          height={70}
-                        />
+                    <div className="col-6">
+                      <div className="d-flex flex-column align-items-end h-100 justify-content-between">
+                        <div className="mb-3">
+                          <span className="badge d-inline-flex align-items-center px-3 py-2" 
+                                style={{
+                                  background: 'linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%)',
+                                  color: 'white',
+                                  borderRadius: '20px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  boxShadow: '0 4px 15px rgba(23, 162, 184, 0.3)',
+                                  border: 'none'
+                                }}>
+                            <i className={`ti ${getTrendIcon(statistics.growthPercentages.totalTickets)} me-1 fs-12`} />
+                            {formatPercentage(statistics.growthPercentages.totalTickets)}
+                          </span>
+                        </div>
+                        <div className="w-100" style={{ height: '70px' }}>
+                          <ReactApexChart
+                            options={Areachart}
+                            series={Areachart.series}
+                            type="bar"
+                            height={70}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="col-xl-3 col-md-6 d-flex">
-              <div className="card flex-fill">
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-6 d-flex">
-                      <div className="flex-fill">
-                        <div className="border border-dashed border-purple rounded-circle d-inline-flex align-items-center justify-content-center p-1 mb-3">
-                          <span className="avatar avatar-lg avatar-rounded bg-transparent-purple">
-                            <i className="ti ti-folder-open fs-20" />
-                          </span>
+            <div className="col-xl-4 col-md-6 d-flex">
+              <div className="card flex-fill shadow-sm border-0" style={{ 
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8f0ff 100%)',
+                borderRadius: '16px',
+                transition: 'all 0.3s ease',
+                border: '1px solid rgba(111, 66, 193, 0.1)'
+              }}>
+                <div className="card-body p-4">
+                  <div className="row align-items-center">
+                    <div className="col-6">
+                      <div className="d-flex flex-column">
+                        <div className="position-relative mb-3">
+                          <div className="d-inline-flex align-items-center justify-content-center" 
+                               style={{
+                                 width: '60px',
+                                 height: '60px',
+                                 background: 'linear-gradient(135deg, #6f42c1 0%, #e83e8c 100%)',
+                                 borderRadius: '20px',
+                                 boxShadow: '0 8px 25px rgba(111, 66, 193, 0.3)',
+                                 position: 'relative'
+                               }}>
+                            <i className="ti ti-folder-open fs-24 text-white" />
+                            <div className="position-absolute top-0 start-100 translate-middle" 
+                                 style={{
+                                   width: '12px',
+                                   height: '12px',
+                                   background: '#6f42c1',
+                                   borderRadius: '50%',
+                                   border: '2px solid white',
+                                   boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                 }}></div>
+                          </div>
                         </div>
-                        <p className="fw-medium fs-12 mb-1">Open Tickets</p>
-                        <h4>60</h4>
+                        <div>
+                          <p className="fw-semibold fs-13 mb-1 text-muted" style={{ letterSpacing: '0.5px' }}>
+                            Open Tickets
+                          </p>
+                          <h3 className="fw-bold mb-0 text-purple" style={{ 
+                            fontSize: '2rem',
+                            textShadow: '0 2px 4px rgba(111, 66, 193, 0.1)'
+                          }}>
+                            {statistics.openTickets}
+                          </h3>
+                        </div>
                       </div>
                     </div>
-                    <div className="col-6 text-end d-flex">
-                      <div className="d-flex flex-column justify-content-between align-items-end">
-                        <span className="badge bg-transparent-dark text-dark d-inline-flex align-items-center mb-3">
-                          <i className="ti ti-arrow-wave-right-down me-1" />
-                          +19.01%
-                        </span>
-                        <ReactApexChart
-                          options={Areachart1}
-                          series={Areachart1.series}
-                          type="bar"
-                          height={70}
-                        />
+                    <div className="col-6">
+                      <div className="d-flex flex-column align-items-end h-100 justify-content-between">
+                        <div className="mb-3">
+                          <span className="badge d-inline-flex align-items-center px-3 py-2" 
+                                style={{
+                                  background: 'linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%)',
+                                  color: 'white',
+                                  borderRadius: '20px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  boxShadow: '0 4px 15px rgba(23, 162, 184, 0.3)',
+                                  border: 'none'
+                                }}>
+                            <i className={`ti ${getTrendIcon(statistics.growthPercentages.openTickets)} me-1 fs-12`} />
+                            {formatPercentage(statistics.growthPercentages.openTickets)}
+                          </span>
+                        </div>
+                        <div className="w-100" style={{ height: '70px' }}>
+                          <ReactApexChart
+                            options={Areachart1}
+                            series={Areachart1.series}
+                            type="bar"
+                            height={70}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="col-xl-3 col-md-6 d-flex">
-              <div className="card flex-fill">
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-6 d-flex">
-                      <div className="flex-fill">
-                        <div className="border border-dashed border-success rounded-circle d-inline-flex align-items-center justify-content-center p-1 mb-3">
-                          <span className="avatar avatar-lg avatar-rounded bg-success-transparent">
-                            <i className="ti ti-checks fs-20" />
+            <div className="col-xl-4 col-md-6 d-flex">
+              <div className="card flex-fill shadow-sm border-0" style={{ 
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fffe 100%)',
+                borderRadius: '16px',
+                transition: 'all 0.3s ease',
+                border: '1px solid rgba(25, 135, 84, 0.1)'
+              }}>
+                <div className="card-body p-4">
+                  <div className="row align-items-center">
+                    <div className="col-6">
+                      <div className="d-flex flex-column">
+                        <div className="position-relative mb-3">
+                          <div className="d-inline-flex align-items-center justify-content-center" 
+                               style={{
+                                 width: '60px',
+                                 height: '60px',
+                                 background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+                                 borderRadius: '20px',
+                                 boxShadow: '0 8px 25px rgba(40, 167, 69, 0.3)',
+                                 position: 'relative'
+                               }}>
+                            <i className="ti ti-checks fs-24 text-white" />
+                            <div className="position-absolute top-0 start-100 translate-middle" 
+                                 style={{
+                                   width: '12px',
+                                   height: '12px',
+                                   background: '#28a745',
+                                   borderRadius: '50%',
+                                   border: '2px solid white',
+                                   boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                 }}></div>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="fw-semibold fs-13 mb-1 text-muted" style={{ letterSpacing: '0.5px' }}>
+                            Solved Tickets
+                          </p>
+                          <h3 className="fw-bold mb-0 text-success" style={{ 
+                            fontSize: '2rem',
+                            textShadow: '0 2px 4px rgba(40, 167, 69, 0.1)'
+                          }}>
+                            {statistics.resolvedTickets}
+                          </h3>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-6">
+                      <div className="d-flex flex-column align-items-end h-100 justify-content-between">
+                        <div className="mb-3">
+                          <span className="badge d-inline-flex align-items-center px-3 py-2" 
+                                style={{
+                                  background: 'linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%)',
+                                  color: 'white',
+                                  borderRadius: '20px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  boxShadow: '0 4px 15px rgba(23, 162, 184, 0.3)',
+                                  border: 'none'
+                                }}>
+                            <i className={`ti ${getTrendIcon(statistics.growthPercentages.resolvedTickets)} me-1 fs-12`} />
+                            {formatPercentage(statistics.growthPercentages.resolvedTickets)}
                           </span>
                         </div>
-                        <p className="fw-medium fs-12 mb-1">Solved Tickets</p>
-                        <h4>50</h4>
-                      </div>
-                    </div>
-                    <div className="col-6 text-end d-flex">
-                      <div className="d-flex flex-column justify-content-between align-items-end">
-                        <span className="badge bg-info-transparent d-inline-flex align-items-center mb-3">
-                          <i className="ti ti-arrow-wave-right-down me-1" />
-                          +19.01%
-                        </span>
-                        <ReactApexChart
-                          options={Areachart2}
-                          series={Areachart2.series}
-                          type="bar"
-                          height={70}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="col-xl-3 col-md-6 d-flex">
-              <div className="card flex-fill">
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-6 d-flex">
-                      <div className="flex-fill">
-                        <div className="border border-dashed border-info rounded-circle d-inline-flex align-items-center justify-content-center p-1 mb-3">
-                          <span className="avatar avatar-lg avatar-rounded bg-info-transparent">
-                            <i className="ti ti-progress-alert fs-20" />
-                          </span>
+                        <div className="w-100" style={{ height: '70px' }}>
+                          <ReactApexChart
+                            options={Areachart2}
+                            series={Areachart2.series}
+                            type="bar"
+                            height={70}
+                          />
                         </div>
-                        <p className="fw-medium fs-12 mb-1">
-                          Pending Tickets
-                        </p>
-                        <h4>10</h4>
                       </div>
                     </div>
-                    <div className="col-6 text-end d-flex">
-                      <div className="d-flex flex-column justify-content-between align-items-end">
-                        <span className="badge bg-secondary-transparent d-inline-flex align-items-center mb-3">
-                          <i className="ti ti-arrow-wave-right-down me-1" />
-                          +19.01%
-                        </span>
-                        <ReactApexChart
-                          options={Areachart3}
-                          series={Areachart3.series}
-                          type="bar"
-                          height={70}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-body p-3">
-              <div className="d-flex align-items-center justify-content-between flex-wrap row-gap-3">
-                <h5>Ticket List</h5>
-                <div className="d-flex align-items-center flex-wrap row-gap-3">
-                  <div className="dropdown me-2">
-                    <Link
-                      to="#"
-                      className="dropdown-toggle btn btn-sm btn-white d-inline-flex align-items-center"
-                      data-bs-toggle="dropdown"
-                    >
-                      Priority
-                    </Link>
-                    <ul className="dropdown-menu  dropdown-menu-end p-3">
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          Priority
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          High
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          Low
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          Medium
-                        </Link>
-                      </li>
-                    </ul>
-                  </div>
-                  <div className="dropdown me-2">
-                    <Link
-                      to="#"
-                      className="dropdown-toggle btn btn-sm btn-white d-inline-flex align-items-center"
-                      data-bs-toggle="dropdown"
-                    >
-                      Select Status
-                    </Link>
-                    <ul className="dropdown-menu  dropdown-menu-end p-3">
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          Open
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          On Hold
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          Reopened
-                        </Link>
-                      </li>
-                    </ul>
-                  </div>
-                  <div className="dropdown">
-                    <Link
-                      to="#"
-                      className="dropdown-toggle btn btn-sm btn-white d-inline-flex align-items-center"
-                      data-bs-toggle="dropdown"
-                    >
-                      Sort By : Last 7 Days
-                    </Link>
-                    <ul className="dropdown-menu  dropdown-menu-end p-3">
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          Recently Added
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          Ascending
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          Desending
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          Last Month
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="#"
-                          className="dropdown-item rounded-1"
-                        >
-                          Last 7 Days
-                        </Link>
-                      </li>
-                    </ul>
                   </div>
                 </div>
               </div>
@@ -680,192 +827,91 @@ const Tickets = () => {
           </div>
           <div className="row">
             <div className="col-xl-9 col-md-8">
-              <div className="card">
-                <div className="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
-                  <h5 className="text-info fw-medium">IT Support</h5>
-                  <div className="d-flex align-items-center">
-                    <span className="badge badge-danger d-inline-flex align-items-center">
-                      <i className="ti ti-circle-filled fs-5 me-1" />
-                      High
-                    </span>
-                  </div>
-                </div>
-                <div className="card-body">
-                  <div>
-                    <span className="badge badge-info rounded-pill mb-2">
-                      Tic - 001
-                    </span>
-                    <div className="d-flex align-items-center mb-2">
-                      <h5 className="fw-semibold me-2">
-                        <Link to={routes.ticketDetails}>Laptop Issue</Link>
-                      </h5>
-                      <span className="badge bg-outline-pink d-flex align-items-center ms-1">
-                        <i className="ti ti-circle-filled fs-5 me-1" />
-                        Open
-                      </span>
-                    </div>
-                    <div className="d-flex align-items-center flex-wrap row-gap-2">
-                      <p className="d-flex align-items-center mb-0 me-2">
-                        <ImageWithBasePath
-                          src="assets/img/profiles/avatar-03.jpg"
-                          className="avatar avatar-xs rounded-circle me-2"
-                          alt="img"
-                        />{" "}
-                        Assigned to{" "}
-                        <span className="text-dark ms-1"> Edgar Hansel</span>
-                      </p>
-                      <p className="d-flex align-items-center mb-0 me-2">
-                        <i className="ti ti-calendar-bolt me-1" />
-                        Updated 10 hours ago
-                      </p>
-                      <p className="d-flex align-items-center mb-0">
-                        <i className="ti ti-message-share me-1" />9 Comments
-                      </p>
-                    </div>
+              {/* Filtres */}
+              <div className="card mb-4">
+                <div className="card-body p-3">
+                  <div className="d-flex align-items-center justify-content-between flex-wrap row-gap-3">
+                    <h5>Ticket List</h5>
+                    <TicketFilters onFiltersChange={handleFiltersChange} />
                   </div>
                 </div>
               </div>
-              <div className="card">
-                <div className="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
-                  <h5 className="text-info fw-medium">IT Support</h5>
-                  <div className="d-flex align-items-center">
-                    <span className="badge badge-success d-inline-flex align-items-center">
-                      <i className="ti ti-circle-filled fs-5 me-1" />
-                      Low
-                    </span>
+              
+              {loading ? (
+                <div className="text-center py-5">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
                   </div>
+                  <p className="mt-3">Chargement des tickets...</p>
                 </div>
-                <div className="card-body">
-                  <div>
-                    <span className="badge badge-info rounded-pill mb-2">
-                      Tic - 002
-                    </span>
-                    <div className="d-flex align-items-center mb-2">
-                      <h5 className="fw-semibold me-2">
-                        <Link to={routes.ticketDetails}>Payment Issue</Link>
-                      </h5>
-                      <span className="badge bg-outline-warning d-flex align-items-center ms-1">
-                        <i className="ti ti-circle-filled fs-5 me-1" />
-                        On Hold
-                      </span>
-                    </div>
-                    <div className="d-flex align-items-center flex-wrap row-gap-2">
-                      <p className="d-flex align-items-center mb-0 me-2">
-                        <ImageWithBasePath
-                          src="assets/img/profiles/avatar-01.jpg"
-                          className="avatar avatar-xs rounded-circle me-2"
-                          alt="img"
-                        />{" "}
-                        Assigned to{" "}
-                        <span className="text-dark ms-1">Ann Lynch</span>
-                      </p>
-                      <p className="d-flex align-items-center mb-0 me-2">
-                        <i className="ti ti-calendar-bolt me-1" />
-                        Updated 15 hours ago
-                      </p>
-                      <p className="d-flex align-items-center mb-0">
-                        <i className="ti ti-message-share me-1" />9 Comments
-                      </p>
-                    </div>
-                  </div>
+              ) : error ? (
+                <div className="alert alert-danger" role="alert">
+                  <i className="ti ti-alert-circle me-2"></i>
+                  {error}
                 </div>
-              </div>
-              <div className="card">
-                <div className="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
-                  <h5 className="text-info fw-medium">IT Support</h5>
-                  <div className="d-flex align-items-center">
-                    <span className="badge badge-warning d-inline-flex align-items-center">
-                      <i className="ti ti-circle-filled fs-5 me-1" />
-                      Medium
-                    </span>
-                  </div>
+              ) : tickets.length === 0 ? (
+                <div className="text-center py-5">
+                  <i className="ti ti-ticket-off display-1 text-muted"></i>
+                  <h4 className="mt-3">Aucun ticket trouvé</h4>
+                  <p className="text-muted">Il n'y a pas encore de tickets dans le système.</p>
                 </div>
-                <div className="card-body">
-                  <div>
-                    <span className="badge badge-info rounded-pill mb-2">
-                      Tic - 003
-                    </span>
-                    <div className="d-flex align-items-center mb-2">
-                      <h5 className="fw-semibold me-2">
-                        <Link to={routes.ticketDetails}>Bug Report</Link>
-                      </h5>
-                      <span className="badge bg-outline-purple d-flex align-items-center ms-1">
-                        <i className="ti ti-circle-filled fs-5 me-1" />
-                        Reopened
-                      </span>
+              ) : (
+                tickets.map((ticket, index) => (
+                  <div key={ticket._id} className="card mb-3">
+                    <div className="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
+                      <h5 className="text-info fw-medium">{getCategoryLabel(ticket.category)}</h5>
+                      <div className="d-flex align-items-center">
+                        <span className={`badge badge-${getPriorityColor(ticket.priority)} d-inline-flex align-items-center`}>
+                          <i className="ti ti-circle-filled fs-5 me-1" />
+                          {ticket.priority}
+                        </span>
+                      </div>
                     </div>
-                    <div className="d-flex align-items-center flex-wrap row-gap-2">
-                      <p className="d-flex align-items-center mb-0 me-2">
-                        <ImageWithBasePath
-                          src="assets/img/profiles/avatar-06.jpg"
-                          className="avatar avatar-xs rounded-circle me-2"
-                          alt="img"
-                        />{" "}
-                        Assigned to{" "}
-                        <span className="text-dark ms-1">Juan Hermann</span>
-                      </p>
-                      <p className="d-flex align-items-center mb-0 me-2">
-                        <i className="ti ti-calendar-bolt me-1" />
-                        Updated 20 hours ago
-                      </p>
-                      <p className="d-flex align-items-center mb-0">
-                        <i className="ti ti-message-share me-1" />9 Comments
-                      </p>
+                    <div className="card-body">
+                      <div>
+                        <span className="badge badge-info rounded-pill mb-2">
+                          Tic - {String(index + 1).padStart(3, '0')}
+                        </span>
+                        <div className="d-flex align-items-center mb-2">
+                          <h5 className="fw-semibold me-2">
+                            {ticket.status === 'RESOLVED' ? (
+                              <span className="text-muted" title="Resolved tickets are view-only">{ticket.title}</span>
+                            ) : (
+                              <Link to={`${routes.ticketDetails}/${ticket._id}`}>{ticket.title}</Link>
+                            )}
+                          </h5>
+                          <span className={`badge bg-outline-${getStatusColor(ticket.status)} d-flex align-items-center ms-1`}>
+                            <i className="ti ti-circle-filled fs-5 me-1" />
+                            {getStatusLabel(ticket.status)}
+                          </span>
+                        </div>
+                        <div className="d-flex align-items-center flex-wrap row-gap-2">
+                          <p className="d-flex align-items-center mb-0 me-2">
+                            <i className="ti ti-calendar-bolt me-1" />
+                            Updated {formatTimeAgo(ticket.updatedAt)}
+                          </p>
+                          <p className="d-flex align-items-center mb-0">
+                            <i className="ti ti-message-share me-1" />
+                            {ticket.comments ? ticket.comments.length : 0} Comments
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                ))
+              )}
+              {tickets.length > 0 && (
+                <div className="text-center mb-4">
+                  <button 
+                    className="btn btn-primary"
+                    onClick={loadTickets}
+                    disabled={loading}
+                  >
+                    <i className="ti ti-loader-3 me-1" />
+                    {loading ? 'Chargement...' : 'Load More'}
+                  </button>
                 </div>
-              </div>
-              <div className="card">
-                <div className="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
-                  <h5 className="text-info fw-medium">IT Support</h5>
-                  <div className="d-flex align-items-center">
-                    <span className="badge badge-success d-inline-flex align-items-center">
-                      <i className="ti ti-circle-filled fs-5 me-1" />
-                      Low
-                    </span>
-                  </div>
-                </div>
-                <div className="card-body">
-                  <div>
-                    <span className="badge badge-info rounded-pill mb-2">
-                      Tic - 004
-                    </span>
-                    <div className="d-flex align-items-center mb-2">
-                      <h5 className="fw-semibold me-2">
-                        <Link to={routes.ticketDetails}>Access Denied</Link>
-                      </h5>
-                      <span className="badge bg-outline-pink d-flex align-items-center ms-1">
-                        <i className="ti ti-circle-filled fs-5 me-1" />
-                        Open
-                      </span>
-                    </div>
-                    <div className="d-flex align-items-center flex-wrap row-gap-2">
-                      <p className="d-flex align-items-center mb-0 me-2">
-                        <ImageWithBasePath
-                          src="assets/img/profiles/avatar-05.jpg"
-                          className="avatar avatar-xs rounded-circle me-2"
-                          alt="img"
-                        />{" "}
-                        Assigned to{" "}
-                        <span className="text-dark ms-1">Jessie Otero</span>
-                      </p>
-                      <p className="d-flex align-items-center mb-0 me-2">
-                        <i className="ti ti-calendar-bolt me-1" />
-                        Updated 23 hours ago
-                      </p>
-                      <p className="d-flex align-items-center mb-0">
-                        <i className="ti ti-message-share me-1" />9 Comments
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="text-center mb-4">
-                <Link to="#" className="btn btn-primary">
-                  <i className="ti ti-loader-3 me-1" />
-                  Load More
-                </Link>
-              </div>
+              )}
             </div>
             <div className="col-xl-3 col-md-4">
               <div className="card">
@@ -874,46 +920,29 @@ const Tickets = () => {
                 </div>
                 <div className="card-body p-0">
                   <div className="d-flex flex-column">
-                    <div className="d-flex align-items-center justify-content-between border-bottom p-3">
-                      <Link to="#">Internet Issue</Link>
-                      <div className="d-flex align-items-center">
-                        <span className="badge badge-xs bg-dark rounded-circle">
-                          0
-                        </span>
-                      </div>
-                    </div>
-                    <div className="d-flex align-items-center justify-content-between border-bottom p-3">
-                      <Link to="#">Computer</Link>
-                      <div className="d-flex align-items-center">
-                        <span className="badge badge-xs bg-dark rounded-circle">
-                          1
-                        </span>
-                      </div>
-                    </div>
-                    <div className="d-flex align-items-center justify-content-between border-bottom p-3">
-                      <Link to="#">Redistribute</Link>
-                      <div className="d-flex align-items-center">
-                        <span className="badge badge-xs bg-dark rounded-circle">
-                          0
-                        </span>
-                      </div>
-                    </div>
-                    <div className="d-flex align-items-center justify-content-between border-bottom p-3">
-                      <Link to="#">Payment</Link>
-                      <div className="d-flex align-items-center">
-                        <span className="badge badge-xs bg-dark rounded-circle">
-                          2
-                        </span>
-                      </div>
-                    </div>
-                    <div className="d-flex align-items-center justify-content-between p-3">
-                      <Link to="#">Complaint</Link>
-                      <div className="d-flex align-items-center">
-                        <span className="badge badge-xs bg-dark rounded-circle">
-                          1
-                        </span>
-                      </div>
-                    </div>
+                    {(() => {
+                      const categoryCounts = tickets.reduce((acc: any[], ticket) => {
+                        const category = ticket.category;
+                        const existing = acc.find(item => item.category === category);
+                        if (existing) {
+                          existing.count++;
+                        } else {
+                          acc.push({ category, count: 1 });
+                        }
+                        return acc;
+                      }, []);
+                      
+                      return categoryCounts.map((item, index) => (
+                        <div key={item.category} className={`d-flex align-items-center justify-content-between ${index < categoryCounts.length - 1 ? 'border-bottom' : ''} p-3`}>
+                          <Link to="#">{getCategoryLabel(item.category)}</Link>
+                          <div className="d-flex align-items-center">
+                            <span className="badge badge-xs bg-dark rounded-circle">
+                              {item.count}
+                            </span>
+                          </div>
+                        </div>
+                      ));
+                    })()}
                   </div>
                 </div>
               </div>
@@ -923,66 +952,46 @@ const Tickets = () => {
                 </div>
                 <div className="card-body p-0">
                   <div className="d-flex flex-column">
-                    <div className="d-flex align-items-center justify-content-between border-bottom p-3">
-                      <span className="d-flex align-items-center">
-                        <ImageWithBasePath
-                          src="assets/img/profiles/avatar-01.jpg"
-                          className="avatar avatar-xs rounded-circle me-2"
-                          alt="img"
-                        />
-                        Edgar Hansel
-                      </span>
-                      <div className="d-flex align-items-center">
-                        <span className="badge badge-xs bg-dark rounded-circle">
-                          0
-                        </span>
-                      </div>
-                    </div>
-                    <div className="d-flex align-items-center justify-content-between border-bottom p-3">
-                      <span className="d-flex align-items-center">
-                        <ImageWithBasePath
-                          src="assets/img/profiles/avatar-02.jpg"
-                          className="avatar avatar-xs rounded-circle me-2"
-                          alt="img"
-                        />
-                        Ann Lynch
-                      </span>
-                      <div className="d-flex align-items-center">
-                        <span className="badge badge-xs bg-dark rounded-circle">
-                          1
-                        </span>
-                      </div>
-                    </div>
-                    <div className="d-flex align-items-center justify-content-between border-bottom p-3">
-                      <span className="d-flex align-items-center">
-                        <ImageWithBasePath
-                          src="assets/img/profiles/avatar-03.jpg"
-                          className="avatar avatar-xs rounded-circle me-2"
-                          alt="img"
-                        />
-                        Juan Hermann
-                      </span>
-                      <div className="d-flex align-items-center">
-                        <span className="badge badge-xs bg-dark rounded-circle">
-                          0
-                        </span>
-                      </div>
-                    </div>
-                    <div className="d-flex align-items-center justify-content-between p-3">
-                      <span className="d-flex align-items-center">
-                        <ImageWithBasePath
-                          src="assets/img/profiles/avatar-04.jpg"
-                          className="avatar avatar-xs rounded-circle me-2"
-                          alt="img"
-                        />
-                        Jessie Otero
-                      </span>
-                      <div className="d-flex align-items-center">
-                        <span className="badge badge-xs bg-dark rounded-circle">
-                          2
-                        </span>
-                      </div>
-                    </div>
+                    {(() => {
+                      const agentCounts = tickets.reduce((acc: any[], ticket) => {
+                        if (ticket.assignedTo) {
+                          const agentId = ticket.assignedTo._id;
+                          const existing = acc.find(item => item.agentId === agentId);
+                          if (existing) {
+                            existing.count++;
+                          } else {
+                            acc.push({ 
+                              agentId, 
+                              name: `${ticket.assignedTo.firstName} ${ticket.assignedTo.lastName}`,
+                              count: 1 
+                            });
+                          }
+                        }
+                        return acc;
+                      }, []);
+                      
+                      return agentCounts.length > 0 ? agentCounts.map((item, index) => (
+                        <div key={item.agentId} className={`d-flex align-items-center justify-content-between ${index < agentCounts.length - 1 ? 'border-bottom' : ''} p-3`}>
+                          <span className="d-flex align-items-center">
+                            <ImageWithBasePath
+                              src="assets/img/profiles/avatar-01.jpg"
+                              className="avatar avatar-xs rounded-circle me-2"
+                              alt="img"
+                            />
+                            {item.name}
+                          </span>
+                          <div className="d-flex align-items-center">
+                            <span className="badge badge-xs bg-dark rounded-circle">
+                              {item.count}
+                            </span>
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="p-3 text-center text-muted">
+                          Aucun agent assigné
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

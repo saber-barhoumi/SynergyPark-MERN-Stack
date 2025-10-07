@@ -6,30 +6,87 @@ class ChatService {
     this.socket = null;
     this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
     this.token = null;
+    this.connectionStatus = 'disconnected';
+    this.connectionCallbacks = [];
   }
 
   // Initialize socket connection
   connect(token) {
     return new Promise((resolve, reject) => {
+      // Disconnect existing socket if any
+      if (this.socket) {
+        console.log('🔌 Disconnecting existing socket before reconnecting');
+        this.socket.disconnect();
+        this.socket = null;
+      }
+      
       this.token = token;
+      
+      console.log('🔌 Attempting to connect to socket at:', this.baseURL);
+      console.log('🔑 Using token:', token ? 'Present' : 'Missing');
       
       this.socket = io(this.baseURL, {
         auth: { token },
-        transports: ['websocket', 'polling']
+        query: { token },
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 3, // Reduced from 5 to 3
+        reconnectionDelay: 2000, // Increased from 1000 to 2000
+        timeout: 20000,
+        extraHeaders: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
       this.socket.on('connect', () => {
-        console.log('Chat socket connected');
+        console.log('✅ Chat socket connected successfully');
+        console.log('🔗 Socket ID:', this.socket.id);
+        this.connectionStatus = 'connected';
+        this.notifyConnectionCallbacks('connected');
         resolve();
       });
 
       this.socket.on('connect_error', (error) => {
-        console.error('Chat socket connection error:', error);
+        console.error('❌ Chat socket connection error:', error);
+        console.error('🔍 Error details:', {
+          message: error.message,
+          description: error.description,
+          context: error.context,
+          type: error.type
+        });
+        this.connectionStatus = 'error';
+        this.notifyConnectionCallbacks('error', error);
         reject(error);
       });
 
       this.socket.on('disconnect', (reason) => {
-        console.log('Chat socket disconnected:', reason);
+        console.log('🔌 Chat socket disconnected:', reason);
+        this.connectionStatus = 'disconnected';
+        this.notifyConnectionCallbacks('disconnected', reason);
+      });
+
+      this.socket.on('reconnect', (attemptNumber) => {
+        console.log('Chat socket reconnected after', attemptNumber, 'attempts');
+        this.connectionStatus = 'connected';
+        this.notifyConnectionCallbacks('connected');
+      });
+
+      this.socket.on('reconnect_attempt', (attemptNumber) => {
+        console.log('Chat socket reconnection attempt:', attemptNumber);
+        this.connectionStatus = 'reconnecting';
+        this.notifyConnectionCallbacks('reconnecting', attemptNumber);
+      });
+
+      this.socket.on('reconnect_error', (error) => {
+        console.error('Chat socket reconnection error:', error);
+        this.connectionStatus = 'error';
+        this.notifyConnectionCallbacks('error', error);
+      });
+
+      this.socket.on('reconnect_failed', () => {
+        console.error('Chat socket reconnection failed');
+        this.connectionStatus = 'failed';
+        this.notifyConnectionCallbacks('failed');
       });
     });
   }
@@ -264,6 +321,32 @@ class ChatService {
     this.socket?.emit('update_status', status);
   }
 
+  // Connection status management
+  notifyConnectionCallbacks(status, data = null) {
+    this.connectionCallbacks.forEach(callback => {
+      try {
+        callback(status, data);
+      } catch (error) {
+        console.error('Error in connection callback:', error);
+      }
+    });
+  }
+
+  onConnectionStatusChange(callback) {
+    this.connectionCallbacks.push(callback);
+    // Return unsubscribe function
+    return () => {
+      const index = this.connectionCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.connectionCallbacks.splice(index, 1);
+      }
+    };
+  }
+
+  getConnectionStatus() {
+    return this.connectionStatus;
+  }
+
   // Utility methods
   removeAllListeners() {
     this.socket?.removeAllListeners();
@@ -271,6 +354,10 @@ class ChatService {
 
   isConnected() {
     return this.socket?.connected || false;
+  }
+
+  getSocket() {
+    return this.socket;
   }
 }
 

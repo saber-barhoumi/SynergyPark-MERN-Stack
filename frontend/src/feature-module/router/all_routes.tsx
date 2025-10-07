@@ -410,7 +410,7 @@ export const all_routes = {
   leavereport: "/leave-report",
   dailyreport: "/daily-report",
 
-
-
+  // Error and unauthorized pages
+  unauthorized: "/unauthorized",
 
 };

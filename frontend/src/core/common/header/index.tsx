@@ -12,11 +12,49 @@ import {
 import { all_routes } from "../../../feature-module/router/all_routes";
 import { HorizontalSidebarData } from '../../data/json/horizontalSidebar'
 import { searchCompanies } from "../../../services/searchService";
+import { useAuth } from "../../../contexts/AuthContext";
+import companyProfileService from "../../../services/companyProfileService";
 import "./search.css";
 
 const Header = () => {
   const Location = useLocation();
   const routes = all_routes;
+  const { user, signout } = useAuth();
+  
+  // Add state for company profile
+  const [companyProfile, setCompanyProfile] = useState<any>(null);
+  
+  // Debug: log user data
+  useEffect(() => {
+    console.log('Header - Current user:', user);
+    if (user) {
+      console.log('Header - User avatar:', user.avatar);
+      if (user.avatar) {
+        const imageUrl = getProfileImageUrl(user.avatar);
+        console.log('Final image URL:', imageUrl);
+        console.log('Full URL with base path:', `${window.location.origin}/${imageUrl}`);
+      }
+    }
+  }, [user]);
+
+  // Fetch company profile for STARTUP users
+  useEffect(() => {
+    const fetchCompanyProfile = async () => {
+      if (user?.role === 'STARTUP' && user?.id) {
+        try {
+          const response = await companyProfileService.getCompanyProfile(user.id);
+          if (response.success) {
+            setCompanyProfile(response.data);
+            console.log('Header - Company profile loaded:', response.data);
+          }
+        } catch (error) {
+          console.error('Error fetching company profile:', error);
+        }
+      }
+    };
+
+    fetchCompanyProfile();
+  }, [user]);
   const [subOpen, setSubOpen] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -110,6 +148,118 @@ const Header = () => {
 
 
 
+
+  // Handle logout
+  const handleLogout = () => {
+    signout();
+  };
+
+  // Helper function to validate and repair data URLs
+  const validateDataUrl = (dataUrl: string): string | null => {
+    try {
+      if (!dataUrl || typeof dataUrl !== 'string') {
+        return null;
+      }
+
+      if (!dataUrl.startsWith('data:image/')) {
+        console.error('Invalid data URL format:', dataUrl.substring(0, 50));
+        return null;
+      }
+
+      const base64Part = dataUrl.split(',')[1];
+      if (!base64Part || base64Part.length < 100) {
+        console.error('Data URL seems truncated:', dataUrl.length, 'characters');
+        return null;
+      }
+
+      const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+      if (!base64Regex.test(base64Part)) {
+        console.error('Invalid base64 in data URL');
+        return null;
+      }
+
+      return dataUrl;
+    } catch (error) {
+      console.error('Error validating data URL:', error);
+      return null;
+    }
+  };
+
+  // Helper function to get correct profile image URL
+  const getProfileImageUrl = (imagePath: string | undefined) => {
+    // Debug: log the input
+    console.log('getProfileImageUrl input:', imagePath);
+    console.log('User object:', user);
+    console.log('Company profile:', companyProfile);
+    
+    // For STARTUP users, prioritize company logo
+    if (user?.role === 'STARTUP' && companyProfile?.logo) {
+      console.log('Using startup logo:', companyProfile.logo);
+      console.log('Logo type:', typeof companyProfile.logo);
+      console.log('Logo length:', companyProfile.logo?.length);
+      console.log('Logo starts with data:', companyProfile.logo?.startsWith('data:'));
+      
+      // If logo is base64, validate and return
+      if (companyProfile.logo.startsWith('data:')) {
+        console.log('Validating base64 data URL...');
+        const validatedUrl = validateDataUrl(companyProfile.logo);
+        if (validatedUrl) {
+          console.log('Returning validated base64 data URL');
+          return validatedUrl;
+        } else {
+          console.error('Base64 data URL validation failed, using default avatar');
+          return "assets/img/profiles/avatar-12.jpg";
+        }
+      }
+      // If logo is a file path, construct full URL
+      if (companyProfile.logo.startsWith('/uploads/')) {
+        const backendUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        const fullUrl = `${backendUrl}${companyProfile.logo}`;
+        console.log('Backend URL for startup logo:', fullUrl);
+        return fullUrl;
+      }
+      return companyProfile.logo;
+    }
+    
+    // If no image path provided, return default avatar
+    if (!imagePath || imagePath.trim() === '') {
+      console.log('No image path, using default avatar');
+      return "assets/img/profiles/avatar-12.jpg";
+    }
+    
+    // If it's already a full URL (starts with http), return as is
+    if (imagePath.startsWith('http')) {
+      console.log('Full URL detected:', imagePath);
+      return imagePath;
+    }
+    
+    // For uploaded files, use the full backend URL
+    if (imagePath.startsWith('/uploads/')) {
+      const backendUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const fullUrl = `${backendUrl}${imagePath}`;
+      console.log('Backend URL for uploads:', fullUrl);
+      return fullUrl;
+    }
+    
+    // If it's a local path starting with /, remove the leading slash for ImageWithBasePath
+    if (imagePath.startsWith('/')) {
+      const pathWithoutSlash = imagePath.substring(1);
+      console.log('Path with leading slash, removing it:', pathWithoutSlash);
+      return pathWithoutSlash;
+    }
+    
+    // For uploaded files, construct the full path to the backend uploads directory
+    if (imagePath.includes('uploads/')) {
+      // If it already contains the uploads path, use it as is
+      console.log('Uploads path detected:', imagePath);
+      return imagePath;
+    } else {
+      // If it's just a filename, assume it's in the profiles uploads directory
+      const fullPath = `uploads/profiles/${imagePath}`;
+      console.log('Constructed uploads path:', fullPath);
+      return fullPath;
+    }
+  };
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const toggleFullscreen = () => {
@@ -498,62 +648,96 @@ const Header = () => {
 									</div>
 								</div>
 							</div>
-							<div className="dropdown profile-dropdown">
-								<Link to="#" className="dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
-									<span className="avatar avatar-sm online">
-										<ImageWithBasePath src="assets/img/profiles/avatar-12.jpg" alt="Img" className="img-fluid rounded-circle"/>
-									</span>
-								</Link>
-								<div className="dropdown-menu shadow-none">
-									<div className="card mb-0">
-										<div className="card-header">
-											<div className="d-flex align-items-center">
-												<span className="avatar avatar-lg me-2 avatar-rounded">
-													<ImageWithBasePath src="assets/img/profiles/avatar-12.jpg" alt="img"/>
-												</span>
-												<div>
-													<h5 className="mb-0">Kevin Larry</h5>
-													<p className="fs-12 fw-medium mb-0">warren@example.com</p>
+							{user ? (
+								<div className="dropdown profile-dropdown">
+									<Link to="#" className="dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
+										<span className="avatar avatar-sm online">
+											<ImageWithBasePath 
+												src={getProfileImageUrl(user.avatar)} 
+												alt="Profile" 
+												className="img-fluid rounded-circle"
+											/>
+										</span>
+									</Link>
+									<div className="dropdown-menu shadow-none">
+										<div className="card mb-0">
+											<div className="card-header">
+												<div className="d-flex align-items-center">
+													<span className="avatar avatar-lg me-2 avatar-rounded">
+														<ImageWithBasePath 
+															src={getProfileImageUrl(user.avatar)} 
+															alt="Profile"
+														/>
+													</span>
+													<div>
+														<h5 className="mb-0">
+															{user.firstName && user.lastName 
+																? `${user.firstName} ${user.lastName}` 
+																: user.username || user.email.split('@')[0] || 'User'
+															}
+														</h5>
+														<p className="fs-12 fw-medium mb-0">
+															{user.email || 'No email'}
+														</p>
+													</div>
 												</div>
 											</div>
-										</div>
-										<div className="card-body">
-											<Link className="dropdown-item d-inline-flex align-items-center p-0 py-2" to={routes.profile}>
-												<i className="ti ti-user-circle me-1"></i>My Profile
-											</Link>
-											<Link className="dropdown-item d-inline-flex align-items-center p-0 py-2" to={routes.bussinessSettings}>
-												<i className="ti ti-settings me-1"></i>Settings
-											</Link>
-											<Link className="dropdown-item d-inline-flex align-items-center p-0 py-2" to={routes.securitysettings}>
-												<i className="ti ti-status-change me-1"></i>Status
-											</Link>
-											<Link className="dropdown-item d-inline-flex align-items-center p-0 py-2" to={routes.profilesettings}>
-												<i className="ti ti-circle-arrow-up me-1"></i>My Account
-											</Link>
-											<Link className="dropdown-item d-inline-flex align-items-center p-0 py-2" to={routes.knowledgebase}>
-												<i className="ti ti-question-mark me-1"></i>Knowledge Base
-											</Link>
-										</div>
-										<div className="card-footer">
-											<Link className="dropdown-item d-inline-flex align-items-center p-0 py-2" to={routes.login}><i className="ti ti-login me-2"></i>Logout</Link>
+											<div className="card-body">
+												<Link className="dropdown-item d-inline-flex align-items-center p-0 py-2" to={routes.profile}>
+													<i className="ti ti-user-circle me-1"></i>My Profile
+												</Link>
+												<Link className="dropdown-item d-inline-flex align-items-center p-0 py-2" to={routes.bussinessSettings}>
+													<i className="ti ti-settings me-1"></i>Settings
+												</Link>
+												<Link className="dropdown-item d-inline-flex align-items-center p-0 py-2" to={routes.securitysettings}>
+													<i className="ti ti-status-change me-1"></i>Status
+												</Link>
+												<Link className="dropdown-item d-inline-flex align-items-center p-0 py-2" to={routes.profilesettings}>
+													<i className="ti ti-circle-arrow-up me-1"></i>My Account
+												</Link>
+												<Link className="dropdown-item d-inline-flex align-items-center p-0 py-2" to={routes.knowledgebase}>
+													<i className="ti ti-question-mark me-1"></i>Knowledge Base
+												</Link>
+											</div>
+											<div className="card-footer">
+												<button 
+													className="dropdown-item d-inline-flex align-items-center p-0 py-2 border-0 bg-transparent" 
+													onClick={handleLogout}
+													style={{ cursor: 'pointer' }}
+												>
+													<i className="ti ti-logout me-2"></i>Logout
+												</button>
+											</div>
 										</div>
 									</div>
 								</div>
-							</div>
+							) : (
+								<Link to={routes.login} className="btn btn-primary">
+									<i className="ti ti-login me-2"></i>Login
+								</Link>
+							)}
 						</div>
 					</div>
 				</div>
 
-				<div className="dropdown mobile-user-menu">
-					<Link to="#" className="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-						<i className="fa fa-ellipsis-v"></i>
-					</Link>
-					<div className="dropdown-menu dropdown-menu-end">
-						<Link className="dropdown-item" to={routes.profile}>My Profile</Link>
-						<Link className="dropdown-item" to={routes.profilesettings}>Settings</Link>
-						<Link className="dropdown-item" to={routes.login}>Logout</Link>
+				{user && (
+					<div className="dropdown mobile-user-menu">
+						<Link to="#" className="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+							<i className="fa fa-ellipsis-v"></i>
+						</Link>
+						<div className="dropdown-menu dropdown-menu-end">
+							<Link className="dropdown-item" to={routes.profile}>My Profile</Link>
+							<Link className="dropdown-item" to={routes.profilesettings}>Settings</Link>
+							<button 
+								className="dropdown-item border-0 bg-transparent" 
+								onClick={handleLogout}
+								style={{ cursor: 'pointer' }}
+							>
+								Logout
+							</button>
+						</div>
 					</div>
-				</div>
+				)}
 
 			</div>
 

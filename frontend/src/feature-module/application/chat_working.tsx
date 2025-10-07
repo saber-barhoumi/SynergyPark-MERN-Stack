@@ -682,26 +682,6 @@ const Chat = () => {
                     <div className="chat-options">
                       <ul>
                         <li>
-                          <Link
-                            className="btn"
-                            to="#"
-                            data-bs-toggle="modal"
-                            data-bs-target="#video-call"
-                          >
-                            <i className="ti ti-phone" />
-                          </Link>
-                        </li>
-                        <li>
-                          <Link
-                            className="btn"
-                            to="#"
-                            data-bs-toggle="modal"
-                            data-bs-target="#video-call"
-                          >
-                            <i className="ti ti-video" />
-                          </Link>
-                        </li>
-                        <li>
                           <Link className="btn" to="#">
                             <i className="ti ti-search" />
                           </Link>

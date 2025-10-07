@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -6,6 +6,8 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { Calendar } from "primereact/calendar";
 import { Link } from "react-router-dom";
 import { all_routes } from "../../router/all_routes";
+import { eventsAPI } from "../../../services/apiService";
+import { useAuth } from "../../../contexts/AuthContext";
 import { DatePicker, TimePicker } from "antd";
 import { Nullable } from "primereact/ts-helpers";
 import PredefinedDateRanges from "../../../core/common/datePicker";
@@ -17,9 +19,7 @@ const Calendars = () => {
   const routes = all_routes;
   const [showAddEventModal, setShowAddEventModal] = useState(false);
   const [showEventDetailsModal, setShowEventDetailsModal] = useState(false);
-  const [eventDetails, setEventDetails] = useState<string>(
-    ""
-  );
+  const [eventDetails, setEventDetails] = useState<any>(null);
 
   const getModalContainer = () => {
     const modalElement = document.getElementById('modal-datepicker');
@@ -31,57 +31,56 @@ const Calendars = () => {
   };
   const calendarRef = useRef(null);
   const [date, setDate] = useState<Nullable<Date>>(null);
+  const { isAuthenticated } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [eventsData, setEventsData] = useState<any[]>([]);
+  const [form, setForm] = useState({ title: '', eventDate: '', startTime: '', endTime: '', location: '', description: '' });
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const res = await eventsAPI.list();
+        if (res.data?.success) {
+          setEventsData(res.data.data.map((e:any) => ({
+            id: e._id,
+            title: e.title,
+            start: e.start,
+            end: e.end || undefined,
+            extendedProps: {
+              location: e.location || '',
+              description: e.description || ''
+            }
+          })));
+        }
+      } catch (e) {
+        // silent
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (isAuthenticated) fetchEvents();
+  }, [isAuthenticated]);
 
   const handleDateClick = () => {
     setShowAddEventModal(true);
   };
 
   const handleEventClick = (info: any) => {
-    setEventDetails(info.event.title);
+    setEventDetails({
+      title: info.event.title,
+      start: info.event.start,
+      end: info.event.end,
+      location: info.event.extendedProps?.location || '',
+      description: info.event.extendedProps?.description || ''
+    });
     setShowEventDetailsModal(true);
   };
 
   const handleAddEventClose = () => setShowAddEventModal(false);
   const handleEventDetailsClose = () => setShowEventDetailsModal(false);
 
-  const events = [
-    {
-      title: 'Meeting with Team Dev',
-      className: 'badge badge-pink-transparent',
-      backgroundColor: '#FFEDF6',
-      textColor: "#FD3995",		
-      start: new Date(Date.now() - 168000000).toJSON().slice(0, 10),
-      end: new Date(Date.now() - 168000000).toJSON().slice(0, 10),
-    },
-    {
-        title: 'UI/UX Team...',	
-        className: 'badge badge-secondary-transparent',
-        backgroundColor: '#EDF2F4' ,
-        textColor: "#0C4B5E",				  
-        start: new Date(Date.now() + 338000000).toJSON().slice(0, 10)
-    },
-    {
-        title: 'Data Update...',
-        className: 'badge badge-purple-transparent',
-        backgroundColor: '#F7EEF9',		
-        textColor: "#AB47BC",		  
-        start: new Date(Date.now() - 338000000).toJSON().slice(0, 10) 
-    },
-    {
-        title: 'Meeting with Team Dev',
-        className: 'badge badge-dark-transparent',
-        backgroundColor: '#E8E9EA',		
-        textColor: "#212529",				  
-        start: new Date(Date.now() + 68000000).toJSON().slice(0, 10) 
-    },
-    {
-        title: 'Design System',
-        className: 'badge badge-danger-transparent',
-        backgroundColor: '#FAE7E7',	
-        textColor: "#E70D0D",				  
-        start: new Date(Date.now() + 88000000).toJSON().slice(0, 10) 
-    },
-  ];
+  const events = eventsData;
 
   return (
     <>
@@ -245,45 +244,7 @@ const Calendars = () => {
                       </div>
                     </div>
                     {/* /Event */}
-                    {/* Upcoming Event */}
-                    <div className="border-bottom pb-2 mb-4">
-                      <h5 className="mb-2">
-                        Upcoming Event
-                        <span className="badge badge-success rounded-pill ms-2">
-                          15
-                        </span>
-                      </h5>
-                      <div className="border-start border-purple border-3 mb-3">
-                        <div className="ps-3">
-                          <h6 className="fw-medium mb-1">Meeting with Team Dev</h6>
-                          <p className="fs-12">
-                            <i className="ti ti-calendar-check text-info me-2" />
-                            15 Mar 2025
-                          </p>
-                        </div>
-                      </div>
-                      <div className="border-start border-pink border-3 mb-3">
-                        <div className="ps-3">
-                          <h6 className="fw-medium mb-1">
-                            Design System With Client
-                          </h6>
-                          <p className="fs-12">
-                            <i className="ti ti-calendar-check text-info me-2" />
-                            24 Mar 2025
-                          </p>
-                        </div>
-                      </div>
-                      <div className="border-start border-success border-3 mb-3">
-                        <div className="ps-3">
-                          <h6 className="fw-medium mb-1">UI/UX Team Call</h6>
-                          <p className="fs-12">
-                            <i className="ti ti-calendar-check text-info me-2" />
-                            28 Mar 2025
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    {/* /Upcoming Event */}
+                    {/* Upcoming Event block removed (using DB events only) */}
                     {/* Upgrade Details */}
                     <div className="bg-dark rounded text-center position-relative p-4">
                       <span className="avatar avatar-lg rounded-circle bg-white mb-2">
@@ -355,7 +316,7 @@ const Calendars = () => {
       <Modal show={showEventDetailsModal} onHide={handleEventDetailsClose}>
         <div className="modal-header bg-dark modal-bg">
           <div className="modal-title text-white">
-            <span id="eventTitle" >{eventDetails}</span>
+            <span id="eventTitle" >{eventDetails?.title || ''}</span>
           </div>
           <button
             type="button"
@@ -370,21 +331,26 @@ const Calendars = () => {
         <div className="modal-body">
           <p className="d-flex align-items-center fw-medium text-black mb-3">
             <i className="ti ti-calendar-check text-default me-2" />
-            26 Jul,2024 to 31 Jul,2024
+            {eventDetails?.start ? new Date(eventDetails.start).toLocaleDateString() : ''}
+            {eventDetails?.end ? ` to ${new Date(eventDetails.end).toLocaleDateString()}` : ''}
           </p>
           <p className="d-flex align-items-center fw-medium text-black mb-3">
-            <i className="ti ti-calendar-check text-default me-2" />
-            11:00 AM to 12:15 PM
+            <i className="ti ti-clock text-default me-2" />
+            {eventDetails?.start ? new Date(eventDetails.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+            {eventDetails?.end ? ` to ${new Date(eventDetails.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
           </p>
-          <p className="d-flex align-items-center fw-medium text-black mb-3">
-            <i className="ti ti-map-pin-bolt text-default me-2" />
-            Las Vegas, US
-          </p>
-          <p className="d-flex align-items-center fw-medium text-black mb-0">
-            <i className="ti ti-calendar-check text-default me-2" />A recurring
-            or repeating event is simply any event that you will occur more than
-            once on your calendar.
-          </p>
+          {eventDetails?.location && (
+            <p className="d-flex align-items-center fw-medium text-black mb-3">
+              <i className="ti ti-map-pin-bolt text-default me-2" />
+              {eventDetails.location}
+            </p>
+          )}
+          {eventDetails?.description && (
+            <p className="d-flex align-items-center fw-medium text-black mb-0">
+              <i className="ti ti-align-left text-default me-2" />
+              {eventDetails.description}
+            </p>
+          )}
         </div>
       </Modal>
       {/* /Event */}
@@ -405,13 +371,49 @@ const Calendars = () => {
                   <i className="ti ti-x" />
                 </button>
               </div>
-              <form action="calendar.html">
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  const start = form.eventDate ? new Date(form.eventDate) : null;
+                  if (start && form.startTime) {
+                    const [h,m] = form.startTime.split(':');
+                    start.setHours(Number(h), Number(m), 0, 0);
+                  }
+                  const end = form.eventDate ? new Date(form.eventDate) : null;
+                  if (end && form.endTime) {
+                    const [h2,m2] = form.endTime.split(':');
+                    end.setHours(Number(h2), Number(m2), 0, 0);
+                  }
+                  const payload:any = { title: form.title, start: start?.toISOString() };
+                  if (end) payload.end = end.toISOString();
+                  if (form.location) payload.location = form.location;
+                  if (form.description) payload.description = form.description;
+                  const res = await eventsAPI.create(payload);
+                  if (res.data?.success) {
+                    setEventsData(prev => prev.concat([{ id: res.data.data._id, title: res.data.data.title, start: res.data.data.start, end: res.data.data.end, extendedProps: { location: res.data.data.location || '', description: res.data.data.description || '' } }]));
+                    setShowAddEventModal(false);
+                    const modalEl = document.getElementById('add_event') as any;
+                    if (modalEl && (window as any).bootstrap?.Modal) {
+                      const existing = (window as any).bootstrap.Modal.getInstance(modalEl);
+                      const modalInstance = existing || new (window as any).bootstrap.Modal(modalEl);
+                      modalInstance.hide();
+                    } else if (modalEl) {
+                      // Fallback: simulate closing by triggering click on dismiss button if present
+                      const dismissBtn = modalEl.querySelector('[data-bs-dismiss="modal"]') as HTMLElement;
+                      dismissBtn?.click();
+                    }
+                    setForm({ title: '', eventDate: '', startTime: '', endTime: '', location: '', description: '' });
+                  }
+                } catch (err) {
+                  // silent
+                }
+              }}>
                 <div className="modal-body">
                   <div className="row">
                     <div className="col-12">
                       <div className="mb-3">
                         <label className="form-label">Event Name</label>
-                        <input type="text" className="form-control" />
+                        <input type="text" className="form-control" value={form.title} onChange={(e)=>setForm({...form,title:e.target.value})} required />
                       </div>
                     </div>
                     <div className="col-12">
@@ -426,6 +428,10 @@ const Calendars = () => {
                             }}
                             getPopupContainer={getModalContainer}
                             placeholder="DD-MM-YYYY"
+                            onChange={(_,str:any)=> {
+                              const s = Array.isArray(str) ? str[0] : str;
+                              setForm({...form, eventDate: s ? s.split('-').reverse().join('-') : ''});
+                            }}
                           />
                           <span className="input-icon-addon">
                             <i className="ti ti-calendar text-gray-7" />
@@ -437,7 +443,7 @@ const Calendars = () => {
                       <div className="mb-3">
                         <label className="form-label">Start Time</label>
                         <div className="input-icon-end position-relative">
-                        <TimePicker getPopupContainer={getModalContainer2} use12Hours placeholder="Choose" format="h:mm A" className="form-control timepicker" />
+                        <TimePicker getPopupContainer={getModalContainer2} use12Hours placeholder="Choose" format="HH:mm" className="form-control timepicker" onChange={(_,str:any)=> setForm({...form,startTime: Array.isArray(str)? (str[0]||'') : str})} />
                           <span className="input-icon-addon">
                             <i className="ti ti-clock text-gray-7" />
                           </span>
@@ -448,7 +454,7 @@ const Calendars = () => {
                       <div className="mb-3">
                         <label className="form-label">End Time</label>
                         <div className="input-icon-end position-relative">
-                        <TimePicker getPopupContainer={getModalContainer2} use12Hours placeholder="Choose" format="h:mm A" className="form-control timepicker" />
+                        <TimePicker getPopupContainer={getModalContainer2} use12Hours placeholder="Choose" format="HH:mm" className="form-control timepicker" onChange={(_,str:any)=> setForm({...form,endTime: Array.isArray(str)? (str[0]||'') : str})} />
                           <span className="input-icon-addon">
                             <i className="ti ti-clock text-gray-7" />
                           </span>
@@ -458,14 +464,15 @@ const Calendars = () => {
                     <div className="col-12">
                       <div className="mb-3">
                         <label className="form-label">Event Location</label>
-                        <input type="text" className="form-control" />
+                        <input type="text" className="form-control" value={form.location} onChange={(e)=>setForm({...form,location:e.target.value})} />
                       </div>
                       <div className="mb-0">
                         <label className="form-label">Descriptions</label>
                         <textarea
                           className="form-control"
                           rows={3}
-                          defaultValue={""}
+                          value={form.description}
+                          onChange={(e)=>setForm({...form,description:e.target.value})}
                         />
                       </div>
                     </div>

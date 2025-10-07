@@ -1,8 +1,7 @@
 // backend/src/middleware/auth.js
 const jwt = require('jsonwebtoken');
 const { User } = require('../models/User');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+const config = require('../config');
 
 console.log('AUTH MIDDLEWARE LOADED');
 
@@ -21,7 +20,7 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, config.security.jwtSecret);
     const user = await User.findById(decoded.userId).select('-password');
 
     if (!user) {

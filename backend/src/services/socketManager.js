@@ -1,6 +1,7 @@
 const socketAuth = require('../middleware/socketAuth');
 const ChatMessage = require('../models/ChatMessage');
 const Conversation = require('../models/Conversation');
+const VoiceCall = require('../models/VoiceCall');
 
 class SocketManager {
   constructor(io) {
@@ -8,19 +9,35 @@ class SocketManager {
     this.connectedUsers = new Map(); // userId -> socketId
     this.userSockets = new Map();    // socketId -> userId
     this.typingUsers = new Map();    // conversationId -> Set of userIds
+    this.activeCalls = new Map();    // callId -> call data
+    this.userCalls = new Map();      // userId -> callId
     
     this.setupSocketHandlers();
+    
+    // Clean up stale calls every 2 minutes
+    setInterval(() => {
+      this.cleanupStaleCalls();
+    }, 2 * 60 * 1000);
   }
 
   setupSocketHandlers() {
     this.io.use(socketAuth);
     
     this.io.on('connection', (socket) => {
-      console.log(`User ${socket.user.userId} connected`);
+      console.log(`👤 User ${socket.user.userId} connected (socket: ${socket.id})`);
+      console.log(`📧 User email: ${socket.user.email}`);
       
       // Store user connection
       this.connectedUsers.set(socket.user.userId, socket.id);
       this.userSockets.set(socket.id, socket.user.userId);
+      
+      // Log current connected users with detailed info
+      console.log(`📊 Total connected users: ${this.connectedUsers.size}`);
+      console.log(`👥 Connected users list:`);
+      this.connectedUsers.forEach((socketId, userId) => {
+        console.log(`   - User ID: ${userId} (Socket: ${socketId})`);
+      });
+      console.log(`🔗 Socket connections: ${this.userSockets.size}`);
       
       // Join user to their conversations
       this.joinUserConversations(socket);
@@ -107,6 +124,53 @@ class SocketManager {
         timestamp: new Date()
       });
     });
+
+    // Voice call events
+    socket.on('initiate_call', async (data) => {
+      try {
+        await this.handleInitiateCall(socket, data);
+      } catch (error) {
+        socket.emit('call_error', { error: error.message });
+      }
+    });
+
+    socket.on('accept_call', async (data) => {
+      try {
+        await this.handleAcceptCall(socket, data);
+      } catch (error) {
+        socket.emit('call_error', { error: error.message });
+      }
+    });
+
+    socket.on('reject_call', async (data) => {
+      try {
+        await this.handleRejectCall(socket, data);
+      } catch (error) {
+        socket.emit('call_error', { error: error.message });
+      }
+    });
+
+    socket.on('end_call', async (data) => {
+      try {
+        await this.handleEndCall(socket, data);
+      } catch (error) {
+        socket.emit('call_error', { error: error.message });
+      }
+    });
+
+    // WebRTC signaling events
+    socket.on('call_offer', (data) => {
+      this.handleCallOffer(socket, data);
+    });
+
+    socket.on('call_answer', (data) => {
+      this.handleCallAnswer(socket, data);
+    });
+
+    socket.on('ice_candidate', (data) => {
+      this.handleIceCandidate(socket, data);
+    });
+
   }
 
   async handleNewMessage(socket, data) {
@@ -291,11 +355,19 @@ class SocketManager {
     const userId = this.userSockets.get(socket.id);
     
     if (userId) {
-      console.log(`User ${userId} disconnected`);
+      console.log(`👤 User ${userId} disconnected (socket: ${socket.id})`);
       
       // Remove from connected users
       this.connectedUsers.delete(userId);
       this.userSockets.delete(socket.id);
+      
+      // Log remaining connected users
+      console.log(`📊 Remaining connected users: ${this.connectedUsers.size}`);
+      console.log(`👥 Remaining users list:`);
+      this.connectedUsers.forEach((socketId, userId) => {
+        console.log(`   - User ID: ${userId} (Socket: ${socketId})`);
+      });
+      console.log(`🔗 Remaining socket connections: ${this.userSockets.size}`);
       
       // Clear typing indicators
       this.typingUsers.forEach((typingSet, conversationId) => {
@@ -339,6 +411,273 @@ class SocketManager {
   getTypingUsers(conversationId) {
     return Array.from(this.typingUsers.get(conversationId) || []);
   }
+
+  // Voice call handlers
+  async handleInitiateCall(socket, data) {
+    const { conversationId, receiverId, callType = 'voice' } = data;
+    const callerId = socket.user.userId;
+
+    // First, clean up any stale calls (older than 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    await VoiceCall.updateMany(
+      {
+        $or: [
+          { callerId, receiverId },
+          { callerId: receiverId, receiverId: callerId }
+        ],
+        status: { $in: ['initiated', 'ringing'] },
+        createdAt: { $lt: fiveMinutesAgo }
+      },
+      {
+        $set: {
+          status: 'ended',
+          endedAt: new Date(),
+          endReason: 'timeout'
+        }
+      }
+    );
+
+    // Check if there's still an active call
+    const existingCall = await VoiceCall.findOne({
+      $or: [
+        { callerId, receiverId, status: { $in: ['initiated', 'ringing', 'accepted'] } },
+        { callerId: receiverId, receiverId: callerId, status: { $in: ['initiated', 'ringing', 'accepted'] } }
+      ]
+    });
+
+    if (existingCall) {
+      // If the existing call is very recent (less than 30 seconds), reject the new call
+      const callAge = Date.now() - new Date(existingCall.createdAt).getTime();
+      if (callAge < 30000) { // 30 seconds
+        throw new Error('There is already an active call with this user');
+      } else {
+        // If the call is older than 30 seconds, end it and allow new call
+        await existingCall.endCall('timeout');
+      }
+    }
+
+    // Create new voice call
+    const voiceCall = new VoiceCall({
+      conversationId,
+      callerId,
+      receiverId,
+      callType,
+      status: 'initiated'
+    });
+
+    await voiceCall.save();
+    await voiceCall.populate([
+      { path: 'callerId', select: 'firstName lastName avatar email' },
+      { path: 'receiverId', select: 'firstName lastName avatar email' }
+    ]);
+
+    // Clean up any existing calls in memory for these users
+    this.cleanupUserCalls(callerId);
+    this.cleanupUserCalls(receiverId);
+
+    // Store call in memory
+    this.activeCalls.set(voiceCall._id.toString(), voiceCall);
+    this.userCalls.set(callerId, voiceCall._id.toString());
+    this.userCalls.set(receiverId, voiceCall._id.toString());
+
+    // Notify caller
+    socket.emit('call_initiated', { call: voiceCall });
+
+    // Notify receiver
+    const receiverSocketId = this.connectedUsers.get(receiverId);
+    if (receiverSocketId) {
+      this.io.to(receiverSocketId).emit('incoming_call', { call: voiceCall });
+    } else {
+      // Receiver is offline, mark call as missed
+      voiceCall.status = 'missed';
+      voiceCall.endedAt = new Date();
+      voiceCall.endReason = 'missed';
+      await voiceCall.save();
+    }
+  }
+
+  async handleAcceptCall(socket, data) {
+    const { callId } = data;
+    const userId = socket.user.userId;
+
+    const voiceCall = await VoiceCall.findOne({
+      _id: callId,
+      receiverId: userId,
+      status: { $in: ['initiated', 'ringing'] }
+    });
+
+    if (!voiceCall) {
+      throw new Error('Call not found or already processed');
+    }
+
+    await voiceCall.acceptCall();
+    await voiceCall.populate([
+      { path: 'callerId', select: 'firstName lastName avatar email' },
+      { path: 'receiverId', select: 'firstName lastName avatar email' }
+    ]);
+
+    // Update call in memory
+    this.activeCalls.set(voiceCall._id.toString(), voiceCall);
+
+    // Notify both parties
+    const callerSocketId = this.connectedUsers.get(voiceCall.callerId);
+    if (callerSocketId) {
+      this.io.to(callerSocketId).emit('call_accepted', { call: voiceCall });
+    }
+
+    socket.emit('call_accepted', { call: voiceCall });
+  }
+
+  async handleRejectCall(socket, data) {
+    const { callId } = data;
+    const userId = socket.user.userId;
+
+    const voiceCall = await VoiceCall.findOne({
+      _id: callId,
+      receiverId: userId,
+      status: { $in: ['initiated', 'ringing'] }
+    });
+
+    if (!voiceCall) {
+      throw new Error('Call not found or already processed');
+    }
+
+    await voiceCall.rejectCall();
+
+    // Remove from memory
+    this.activeCalls.delete(voiceCall._id.toString());
+    this.userCalls.delete(voiceCall.callerId);
+    this.userCalls.delete(voiceCall.receiverId);
+
+    // Notify caller - ensure ID is string
+    const callerIdStr = voiceCall.callerId.toString();
+    const callerSocketId = this.connectedUsers.get(callerIdStr);
+    if (callerSocketId) {
+      this.io.to(callerSocketId).emit('call_rejected', { call: voiceCall });
+    }
+
+    socket.emit('call_rejected', { call: voiceCall });
+  }
+
+  async handleEndCall(socket, data) {
+    const { callId, reason = 'normal' } = data;
+    const userId = socket.user.userId;
+
+    const voiceCall = await VoiceCall.findOne({
+      _id: callId,
+      $or: [
+        { callerId: userId },
+        { receiverId: userId }
+      ],
+      status: { $in: ['initiated', 'ringing', 'accepted'] }
+    });
+
+    if (!voiceCall) {
+      // Call not found or already ended - this is not necessarily an error
+      // Just return without throwing an error
+      return;
+    }
+
+    await voiceCall.endCall(reason);
+
+    // Remove from memory
+    this.activeCalls.delete(voiceCall._id.toString());
+    this.userCalls.delete(voiceCall.callerId);
+    this.userCalls.delete(voiceCall.receiverId);
+
+    // Notify both parties - ensure IDs are strings
+    const callerIdStr = voiceCall.callerId.toString();
+    const receiverIdStr = voiceCall.receiverId.toString();
+    const callerSocketId = this.connectedUsers.get(callerIdStr);
+    const receiverSocketId = this.connectedUsers.get(receiverIdStr);
+
+
+    // Notify caller
+    if (callerSocketId) {
+      this.io.to(callerSocketId).emit('call_ended', { call: voiceCall });
+    }
+    
+    // Notify receiver
+    if (receiverSocketId) {
+      this.io.to(receiverSocketId).emit('call_ended', { call: voiceCall });
+    }
+  }
+
+  // WebRTC signaling handlers
+  handleCallOffer(socket, data) {
+    const { callId, offer, receiverId } = data;
+    
+    const receiverSocketId = this.connectedUsers.get(receiverId);
+    if (receiverSocketId) {
+      this.io.to(receiverSocketId).emit('call_offer', {
+        callId,
+        offer,
+        callerId: socket.user.userId
+      });
+    }
+  }
+
+  handleCallAnswer(socket, data) {
+    const { callId, answer, callerId } = data;
+    
+    const callerSocketId = this.connectedUsers.get(callerId);
+    if (callerSocketId) {
+      this.io.to(callerSocketId).emit('call_answer', {
+        callId,
+        answer,
+        receiverId: socket.user.userId
+      });
+    }
+  }
+
+  handleIceCandidate(socket, data) {
+    const { callId, candidate, targetUserId } = data;
+    
+    const targetSocketId = this.connectedUsers.get(targetUserId);
+    if (targetSocketId) {
+      this.io.to(targetSocketId).emit('ice_candidate', {
+        callId,
+        candidate,
+        fromUserId: socket.user.userId
+      });
+    }
+  }
+
+  // Get active call for user
+  getActiveCall(userId) {
+    const callId = this.userCalls.get(userId);
+    return callId ? this.activeCalls.get(callId) : null;
+  }
+
+  // Check if user is in a call
+  isUserInCall(userId) {
+    return this.userCalls.has(userId);
+  }
+
+  // Clean up calls for a specific user
+  cleanupUserCalls(userId) {
+    const callId = this.userCalls.get(userId);
+    if (callId) {
+      this.activeCalls.delete(callId);
+      this.userCalls.delete(userId);
+    }
+  }
+
+  // Clean up all stale calls in memory
+  cleanupStaleCalls() {
+    const now = Date.now();
+    const staleThreshold = 5 * 60 * 1000; // 5 minutes
+
+    for (const [callId, call] of this.activeCalls.entries()) {
+      const callAge = now - new Date(call.createdAt).getTime();
+      if (callAge > staleThreshold) {
+        this.activeCalls.delete(callId);
+        this.userCalls.delete(call.callerId);
+        this.userCalls.delete(call.receiverId);
+      }
+    }
+  }
+
 }
 
 module.exports = SocketManager;

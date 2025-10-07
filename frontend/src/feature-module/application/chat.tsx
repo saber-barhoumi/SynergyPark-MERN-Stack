@@ -6,7 +6,10 @@ import ImageWithBasePath from "../../core/common/imageWithBasePath";
 import "react-modal-video/scss/modal-video.scss";
 import CollapseHeader from "../../core/common/collapse-header/collapse-header";
 import ChatService from "../../services/chatService";
+import VoiceCallService from "../../services/voiceCallService";
+import VoiceCallModal from "../../components/VoiceCallModal";
 import { useAuth } from "../../contexts/AuthContext";
+import "../../style/scss/connection-indicator.scss";
 
 interface User {
   _id: string;
@@ -111,6 +114,10 @@ const Chat = () => {
   const routes = all_routes;
   const { user: currentUser } = useAuth();
   
+  // Debug currentUser
+  console.log('Chat: currentUser from useAuth:', currentUser);
+  console.log('Chat: currentUser._id:', currentUser?._id);
+  
   // State management
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
@@ -128,6 +135,11 @@ const Chat = () => {
   const [messageSearchTerm, setMessageSearchTerm] = useState("");
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   
+  // Voice call states
+  const [showVoiceCallModal, setShowVoiceCallModal] = useState(false);
+  const [currentCall, setCurrentCall] = useState<any>(null);
+  const [isInCall, setIsInCall] = useState(false);
+  
   // UI Modal states
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
@@ -136,6 +148,9 @@ const Chat = () => {
   const [showUnblockModal, setShowUnblockModal] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
   const [modalMessage, setModalMessage] = useState("");
+  
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [socketReconnecting, setSocketReconnecting] = useState(false);
   const [modalType, setModalType] = useState<"success" | "error" | "info">("info");
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
@@ -171,6 +186,104 @@ const Chat = () => {
       if (currentTimer) {
         clearInterval(currentTimer);
       }
+    };
+  }, []);
+
+  // Socket connection status monitoring
+  useEffect(() => {
+    const unsubscribe = ChatService.onConnectionStatusChange((status: string, data?: any) => {
+      console.log('Socket connection status changed:', status, data);
+      switch (status) {
+        case 'connected':
+          setSocketConnected(true);
+          setSocketReconnecting(false);
+          // Initialize voice call service when socket connects
+          VoiceCallService.initializeSocket(ChatService.getSocket());
+          break;
+        case 'disconnected':
+          setSocketConnected(false);
+          setSocketReconnecting(false);
+          break;
+        case 'reconnecting':
+          setSocketConnected(false);
+          setSocketReconnecting(true);
+          break;
+        case 'error':
+        case 'failed':
+          setSocketConnected(false);
+          setSocketReconnecting(false);
+          break;
+        default:
+          break;
+      }
+    });
+
+    // Set initial connection status
+    setSocketConnected(ChatService.isConnected());
+    
+    // Initialize voice call service if socket is already connected
+    if (ChatService.isConnected()) {
+      VoiceCallService.initializeSocket(ChatService.getSocket());
+    }
+
+    return unsubscribe;
+  }, []);
+
+  // Voice call event handlers
+  useEffect(() => {
+    VoiceCallService.setCallHandlers({
+      onIncomingCall: (call: any) => {
+        console.log('Chat: Incoming call handler triggered:', call);
+        setCurrentCall(call);
+        setShowVoiceCallModal(true);
+        setIsInCall(true);
+      },
+      onCallInitiated: (call: any) => {
+        console.log('Chat: Call initiated handler triggered:', call);
+        setCurrentCall(call);
+        setShowVoiceCallModal(true);
+        setIsInCall(true);
+      },
+      onCallAccepted: (call: any) => {
+        console.log('Chat: Call accepted:', call);
+        setCurrentCall(call);
+        setShowVoiceCallModal(true);
+        setIsInCall(true);
+      },
+      onCallRejected: (call: any) => {
+        setCurrentCall(null);
+        setShowVoiceCallModal(false);
+        setIsInCall(false);
+        setModalMessage('Call was rejected');
+        setModalType('info');
+      },
+      onCallEnded: (call: any) => {
+        setCurrentCall(null);
+        setShowVoiceCallModal(false);
+        setIsInCall(false);
+      },
+      onCallError: (error: string) => {
+        setModalMessage(`Call error: ${error}`);
+        setModalType('error');
+      },
+      onRemoteStream: (stream: MediaStream) => {
+        console.log('Chat: Remote stream received:', stream);
+        // The stream will be handled by the VoiceCallModal component
+      },
+      onConnectionStateChange: (state: string) => {
+        console.log('Chat: WebRTC connection state changed:', state);
+        if (state === 'connected') {
+          setModalMessage('Appel connecté avec succès');
+          setModalType('success');
+        } else if (state === 'failed' || state === 'disconnected') {
+          setModalMessage('Connexion audio perdue');
+          setModalType('error');
+        }
+      }
+    });
+
+    return () => {
+      VoiceCallService.disconnect();
     };
   }, []);
 
@@ -344,6 +457,17 @@ const Chat = () => {
           // Initialize chat service with token
           ChatService.token = token;
           
+          // Connect to socket for real-time communication
+          try {
+            await ChatService.connect(token);
+            console.log('Socket connected successfully');
+            setSocketConnected(true);
+          } catch (socketError) {
+            console.error('Failed to connect socket:', socketError);
+            setSocketConnected(false);
+            // Continue without socket connection
+          }
+          
           // Fetch users for chat list
           const usersResponse = await ChatService.getUsers();
           const users = usersResponse || [];
@@ -485,6 +609,18 @@ const Chat = () => {
       loadMessagesForUser(selectedUser._id);
     }
   }, [selectedUser, loadMessagesForUser]);
+
+  useEffect(() => {
+    if (!ChatService.socket) return;
+
+    const socket = ChatService.socket;
+
+
+
+    return () => {
+    };
+  }, []);
+
 
   // Filter and sort chat users based on search term
   const filteredChatUsers = React.useMemo(() => {
@@ -651,6 +787,64 @@ const Chat = () => {
     setShowMessageSearch(!showMessageSearch);
     if (!showMessageSearch) {
       setMessageSearchTerm("");
+    }
+  };
+
+  // Voice call handlers
+  const handleInitiateCall = async () => {
+    if (!selectedUser || !currentConversation || isInCall) return;
+    
+    try {
+      await VoiceCallService.initiateCall(
+        currentConversation._id,
+        selectedUser._id,
+        'voice'
+      );
+    } catch (error) {
+      console.error('Error initiating call:', error);
+      setModalMessage('Failed to initiate call. Please try again.');
+      setModalType('error');
+    }
+  };
+
+  const handleAcceptCall = async (callId: string) => {
+    try {
+      console.log('Chat: handleAcceptCall called with callId:', callId);
+      await VoiceCallService.acceptCall(callId);
+      console.log('Chat: Call accepted successfully');
+    } catch (error) {
+      console.error('Error accepting call:', error);
+      setModalMessage('Failed to accept call. Please try again.');
+      setModalType('error');
+    }
+  };
+
+  const handleRejectCall = async (callId: string) => {
+    try {
+      await VoiceCallService.rejectCall(callId);
+    } catch (error) {
+      console.error('Error rejecting call:', error);
+      setModalMessage('Failed to reject call. Please try again.');
+      setModalType('error');
+    }
+  };
+
+  const handleEndCall = async (callId: string) => {
+    try {
+      await VoiceCallService.endCall(callId);
+      
+      // Don't close modal immediately - wait for call_ended event
+      // The modal will be closed by the onCallEnded handler
+      
+    } catch (error) {
+      console.error('Error ending call:', error);
+      setModalMessage('Failed to end call. Please try again.');
+      setModalType('error');
+      
+      // Only close modal on error
+      setShowVoiceCallModal(false);
+      setCurrentCall(null);
+      setIsInCall(false);
     }
   };
 
@@ -1028,17 +1222,36 @@ const Chat = () => {
   };
 
   // Format last seen
-  const formatLastSeen = (date: Date) => {
-    const now = new Date();
-    const diffMs = now.getTime() - new Date(date).getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+  const formatLastSeen = (date: Date | string | null | undefined) => {
+    if (!date) return 'Unknown';
+    
+    try {
+      const now = new Date();
+      const targetDate = new Date(date);
+      
+      // Check if the date is valid
+      if (isNaN(targetDate.getTime())) {
+        return 'Unknown';
+      }
+      
+      const diffMs = now.getTime() - targetDate.getTime();
+      
+      // Check if the difference is valid
+      if (isNaN(diffMs) || diffMs < 0) {
+        return 'Unknown';
+      }
+      
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 5) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+      if (diffMins < 5) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      return `${diffDays}d ago`;
+    } catch (error) {
+      return 'Unknown';
+    }
   };
 
   // Handle audio playback
@@ -1281,9 +1494,11 @@ const Chat = () => {
                                           ) : chatUser.lastMessage.messageType === 'emoji' ? (
                                             chatUser.lastMessage.content?.emoji || '😊'
                                           ) : (
-                                            chatUser.lastMessage.content?.text?.substring(0, 30) + 
-                                            (chatUser.lastMessage.content?.text && chatUser.lastMessage.content.text.length > 30 ? '...' : '') ||
-                                            'No message'
+                                            (chatUser.lastMessage.content?.text ? 
+                                              chatUser.lastMessage.content.text.substring(0, 30) + 
+                                              (chatUser.lastMessage.content.text.length > 30 ? '...' : '') :
+                                              'No message'
+                                            )
                                           )}
                                         </span>
                                       ) : chatUser.isOnline ? (
@@ -1298,7 +1513,7 @@ const Chat = () => {
                                   <div className="chat-user-time">
                                     <span className="time" style={{ fontSize: '12px' }}>
                                       {chatUser.lastMessage ? 
-                                        formatLastSeen(new Date(chatUser.lastMessage.createdAt)) :
+                                        formatLastSeen(chatUser.lastMessage.createdAt) :
                                         formatLastSeen(chatUser.lastSeen)
                                       }
                                     </span>
@@ -1350,13 +1565,71 @@ const Chat = () => {
                           />
                         </div>
                         <div className="mt-1">
+                          {/* Socket Connection Status */}
+                          <div className="d-flex align-items-center mb-1">
+                            <div className={`connection-indicator me-2 ${socketConnected ? 'connected' : socketReconnecting ? 'reconnecting' : 'disconnected'}`}>
+                              <i className={`ti ${socketConnected ? 'ti-wifi' : socketReconnecting ? 'ti-loader' : 'ti-wifi-off'}`}></i>
+                            </div>
+                            <small className={`text-${socketConnected ? 'success' : socketReconnecting ? 'warning' : 'danger'}`}>
+                              {socketConnected ? 'Connected' : socketReconnecting ? 'Reconnecting...' : 'Disconnected'}
+                            </small>
+                            {!socketConnected && !socketReconnecting && (
+                              <div className="d-flex gap-2">
+                                <button 
+                                  className="btn btn-sm btn-outline-primary"
+                                  onClick={async () => {
+                                    const token = localStorage.getItem('token');
+                                    if (token) {
+                                      try {
+                                        setModalMessage('Reconnecting...');
+                                        setModalType('info');
+                                        await ChatService.connect(token);
+                                        setModalMessage('Socket reconnected successfully');
+                                        setModalType('success');
+                                      } catch (error) {
+                                        console.error('Reconnection failed:', error);
+                                        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+                                        setModalMessage(`Failed to reconnect socket: ${errorMessage}`);
+                                        setModalType('error');
+                                      }
+                                    } else {
+                                      setModalMessage('No authentication token found. Please log in again.');
+                                      setModalType('error');
+                                    }
+                                  }}
+                                >
+                                  <i className="ti ti-refresh"></i> Reconnect
+                                </button>
+                                <button 
+                                  className="btn btn-sm btn-outline-info"
+                                  onClick={() => {
+                                    const token = localStorage.getItem('token');
+                                    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+                                    const diagnosticInfo = `
+Diagnostic Information:
+- Backend URL: ${baseURL}
+- Token: ${token ? 'Present' : 'Missing'}
+- Socket Status: ${ChatService.getConnectionStatus()}
+- Socket Connected: ${ChatService.isConnected()}
+- Current Time: ${new Date().toISOString()}
+                                    `;
+                                    console.log(diagnosticInfo);
+                                    setModalMessage('Diagnostic information logged to console. Please check browser console.');
+                                    setModalType('info');
+                                  }}
+                                >
+                                  <i className="ti ti-bug"></i> Debug
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           <h6>{getUserDisplayName(selectedUser)}</h6>
                           <p className="last-seen">
                             {selectedUser ? (
                               chatUsers.find(cu => cu.user._id === selectedUser._id)?.isOnline ? (
                                 <span className="text-success">Online</span>
                               ) : (
-                                <span>Last Seen at {formatLastSeen(new Date())}</span>
+                                <span>Last Seen {formatLastSeen(chatUsers.find(cu => cu.user._id === selectedUser._id)?.lastSeen)}</span>
                               )
                             ) : (
                               'Select a user to start chatting'
@@ -1367,26 +1640,6 @@ const Chat = () => {
                     </div>
                     <div className="chat-options">
                       <ul>
-                        <li>
-                          <Link
-                            className="btn"
-                            to="#"
-                            data-bs-toggle="modal"
-                            data-bs-target="#video-call"
-                          >
-                            <i className="ti ti-phone" />
-                          </Link>
-                        </li>
-                        <li>
-                          <Link
-                            className="btn"
-                            to="#"
-                            data-bs-toggle="modal"
-                            data-bs-target="#video-call"
-                          >
-                            <i className="ti ti-video" />
-                          </Link>
-                        </li>
                         <li>
                           <button 
                             className="btn" 
@@ -1400,6 +1653,24 @@ const Chat = () => {
                             <i className="ti ti-search" />
                           </button>
                         </li>
+                        {selectedUser && !isInCall && (
+                          <li>
+                            <button 
+                              className="btn" 
+                              type="button"
+                              onClick={handleInitiateCall}
+                              disabled={!socketConnected}
+                              style={{ 
+                                background: 'transparent',
+                                color: socketConnected ? '#28a745' : '#6c757d',
+                                cursor: socketConnected ? 'pointer' : 'not-allowed'
+                              }}
+                              title="Start Voice Call"
+                            >
+                              <i className="ti ti-phone" />
+                            </button>
+                          </li>
+                        )}
                         <li className="dropdown">
                           <Link
                             to="#"
@@ -2262,6 +2533,20 @@ const Chat = () => {
           </div>
         </div>
       )}
+
+      {/* Voice Call Modal */}
+      {showVoiceCallModal && currentCall && (
+        <VoiceCallModal
+          show={showVoiceCallModal}
+          onHide={() => setShowVoiceCallModal(false)}
+          call={currentCall}
+          currentUserId={currentUser?._id || ''}
+          onAccept={handleAcceptCall}
+          onReject={handleRejectCall}
+          onEnd={handleEndCall}
+        />
+      )}
+
       {/* /Page Wrapper */}
     </>
   );

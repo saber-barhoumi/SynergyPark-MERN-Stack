@@ -9,13 +9,14 @@ export type Option = {
 export interface SelectProps {
   options: Option[];
   defaultValue?: Option;
+  value?: Option;
   className?: string;
   styles?: any;
   onChange?: (selectedOption: Option | null) => void;
 }
 
-const CommonSelect: React.FC<SelectProps> = ({ options, defaultValue, className, onChange }) => {
-  const [selectedOption, setSelectedOption] = useState<Option | undefined>(defaultValue);
+const CommonSelect: React.FC<SelectProps> = ({ options, defaultValue, value, className, onChange }) => {
+  const [selectedOption, setSelectedOption] = useState<Option | undefined>(value || defaultValue);
 
   const handleChange = (option: Option | null) => {
     setSelectedOption(option || undefined);
@@ -23,9 +24,21 @@ const CommonSelect: React.FC<SelectProps> = ({ options, defaultValue, className,
       onChange(option);
     }
   };
+  
   useEffect(() => {
-    setSelectedOption(defaultValue || undefined);
-  }, [defaultValue])
+    if (value !== undefined) {
+      setSelectedOption(value);
+    } else if (defaultValue !== undefined) {
+      setSelectedOption(defaultValue);
+    }
+  }, [value, defaultValue]);
+
+  // Effet pour synchroniser avec les changements de defaultValue
+  useEffect(() => {
+    if (defaultValue !== undefined) {
+      setSelectedOption(defaultValue);
+    }
+  }, [defaultValue]);
   
   return (
     <Select

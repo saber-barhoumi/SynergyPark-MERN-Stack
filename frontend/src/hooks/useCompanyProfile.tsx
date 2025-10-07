@@ -10,12 +10,21 @@ interface CompanyProfile {
   companyName: string;
   founderName: string;
   email: string;
+  phone?: string;
   companyCreationDate: string;
   activityDomain: string;
   activitySubDomain?: string;
   projectProgress: string;
   staffRange: string;
   address?: string;
+  // Optional identity and site info
+  slogan?: string;
+  logo?: string;
+  website?: string;
+  longDescription?: string;
+  businessPlanSummary?: string;
+  staffPositions?: string;
+  targetMarket?: string;
   requestStatus: string;
   createdAt?: string;
   updatedAt?: string;

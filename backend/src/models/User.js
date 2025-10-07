@@ -21,6 +21,28 @@ const userSchema = new mongoose.Schema({
   profilePhoto: { type: String, default: '' },
   avatar: { type: String, default: '' },
   
+  // ✅ User Management Fields
+  status: { 
+    type: String, 
+    enum: ['PENDING', 'APPROVED', 'REJECTED'], 
+    default: function() {
+      // Les utilisateurs S2T sont automatiquement approuvés
+      return this.role === 'S2T' ? 'APPROVED' : 'PENDING';
+    }
+  },
+  blocked: { type: Boolean, default: false },
+  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  approvedAt: { 
+    type: Date, 
+    default: function() {
+      // Les utilisateurs S2T sont automatiquement approuvés
+      return this.role === 'S2T' ? new Date() : null;
+    }
+  },
+  rejectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  rejectedAt: { type: Date, default: null },
+  rejectionReason: { type: String, default: '' },
+  
   // ✅ Additional Profile Fields
   phone: { type: String, default: '' },
   address: { type: String, default: '' },

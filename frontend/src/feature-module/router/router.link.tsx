@@ -288,6 +288,7 @@ import PurchaseTransaction from "../super-admin/purchase-transaction";
 import Termination from "../hrm/termination";
 import Resignation from "../hrm/resignation";
 import Promotion from "../hrm/promotion";
+import Unauthorized from "../pages/unauthorized";
 import Trainers from "../training/trainers";
 import TrainingList from "../training/trainingList";
 import Invoices from "../finance-accounts/sales/invoices";
@@ -345,6 +346,10 @@ export const publicRoutes = [
   {
     path: routes.promotion,
     element: <Promotion />,
+  },
+  {
+    path: routes.unauthorized,
+    element: <Unauthorized />,
   },
   {
     path: routes.trainingType,
@@ -992,7 +997,16 @@ export const publicRoutes = [
   },
 
 
-
+  {
+  path: routes.ticketDetails,
+  element: <TicketDetails />,
+  route: Route,
+},
+{
+  path: `${routes.ticketDetails}/:id`,
+  element: <TicketDetails />,
+  route: Route,
+},
 
   {
     path: routes.Horizontal,

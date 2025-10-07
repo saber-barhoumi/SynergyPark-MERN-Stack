@@ -8,9 +8,10 @@ const svgCaptcha = require('svg-captcha');
 const { User, UserRole } = require('../models/User');
 const { sendResetEmail } = require('../services/emailService');
 const userController = require('../controllers/userController');
+const config = require('../config');
 
-// JWT Secret (in production, use environment variable)
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+// JWT Secret - Use centralized config
+const JWT_SECRET = config.security.jwtSecret;
 
 // Store for reset tokens (in production, use Redis or database)
 const resetTokens = new Map();

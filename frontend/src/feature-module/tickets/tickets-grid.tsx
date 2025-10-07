@@ -1,13 +1,68 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import ImageWithBasePath from "../../core/common/imageWithBasePath";
 import { all_routes } from "../router/all_routes";
 import ReactApexChart from "react-apexcharts";
 import TicketGridModal from "../../core/modals/ticketGridModal";
 import CollapseHeader from "../../core/common/collapse-header/collapse-header";
+import ticketService from "../../services/ticketService";
+import { useAuth } from "../../contexts/AuthContext";
 
 const TicketGrid = () => {
     const routes = all_routes
+    const { user } = useAuth();
+
+    // États pour les statistiques
+    const [statistics, setStatistics] = useState({
+      totalTickets: 0,
+      openTickets: 0,
+      resolvedTickets: 0,
+      pendingTickets: 0,
+      growthPercentages: {
+        totalTickets: 0,
+        openTickets: 0,
+        resolvedTickets: 0
+      }
+    });
+
+    // Charger les statistiques
+    useEffect(() => {
+      loadStatistics();
+    }, []);
+
+    const loadStatistics = async () => {
+      try {
+        const response = await ticketService.getTicketStatistics();
+        
+        if (response.success) {
+          const stats = response.data.overview;
+          setStatistics({
+            totalTickets: stats.totalTickets || 0,
+            openTickets: stats.openTickets || 0,
+            resolvedTickets: stats.resolvedTickets || 0,
+            pendingTickets: stats.inProgressTickets || 0,
+            growthPercentages: stats.growthPercentages || {
+              totalTickets: 0,
+              openTickets: 0,
+              resolvedTickets: 0
+            }
+          });
+        }
+      } catch (err: any) {
+        console.error('Erreur lors du chargement des statistiques:', err);
+      }
+    };
+
+    // Fonction pour formater les pourcentages
+    const formatPercentage = (percentage: number) => {
+      const sign = percentage >= 0 ? '+' : '';
+      return `${sign}${percentage.toFixed(1)}%`;
+    };
+
+    // Fonction pour obtenir l'icône de tendance
+    const getTrendIcon = (percentage: number) => {
+      return percentage >= 0 ? 'ti-trending-up' : 'ti-trending-down';
+    };
 
     const [Areachart] = useState<any>({
         series: [
@@ -384,17 +439,19 @@ const TicketGrid = () => {
                     </ul>
                   </div>
                 </div>
-                <div className="mb-2">
-                  <Link
-                    to="#"
-                    data-bs-toggle="modal"
-                    data-bs-target="#add_ticket"
-                    className="btn btn-primary d-flex align-items-center"
-                  >
-                    <i className="ti ti-circle-plus me-2" />
-                    Add Ticket
-                  </Link>
-                </div>
+                {user?.role === 'STARTUP' && (
+                  <div className="mb-2">
+                    <Link
+                      to="#"
+                      data-bs-toggle="modal"
+                      data-bs-target="#add_ticket"
+                      className="btn btn-primary d-flex align-items-center"
+                    >
+                      <i className="ti ti-circle-plus me-2" />
+                      Add Ticket
+                    </Link>
+                  </div>
+                )}
                 <div className="head-icons ms-2">
                 <CollapseHeader />
                 </div>
@@ -402,134 +459,231 @@ const TicketGrid = () => {
             </div>
             {/* /Breadcrumb */}
             <div className="row">
-              <div className="col-xl-3 col-md-6 d-flex">
-                <div className="card flex-fill">
-                  <div className="card-body">
-                    <div className="row">
-                      <div className="col-6 d-flex">
-                        <div className="flex-fill">
-                          <div className="border border-dashed border-primary rounded-circle d-inline-flex align-items-center justify-content-center p-1 mb-3">
-                            <span className="avatar avatar-lg avatar-rounded bg-primary-transparent ">
-                              <i className="ti ti-ticket fs-20" />
-                            </span>
+              <div className="col-xl-4 col-md-6 d-flex">
+                <div className="card flex-fill shadow-sm border-0" style={{ 
+                  background: 'linear-gradient(135deg, #ffffff 0%, #fff8f0 100%)',
+                  borderRadius: '16px',
+                  transition: 'all 0.3s ease',
+                  border: '1px solid rgba(255, 193, 7, 0.1)'
+                }}>
+                  <div className="card-body p-4">
+                    <div className="row align-items-center">
+                      <div className="col-6">
+                        <div className="d-flex flex-column">
+                          <div className="position-relative mb-3">
+                            <div className="d-inline-flex align-items-center justify-content-center" 
+                                 style={{
+                                   width: '60px',
+                                   height: '60px',
+                                   background: 'linear-gradient(135deg, #ffc107 0%, #fd7e14 100%)',
+                                   borderRadius: '20px',
+                                   boxShadow: '0 8px 25px rgba(255, 193, 7, 0.3)',
+                                   position: 'relative'
+                                 }}>
+                              <i className="ti ti-ticket fs-24 text-white" />
+                              <div className="position-absolute top-0 start-100 translate-middle" 
+                                   style={{
+                                     width: '12px',
+                                     height: '12px',
+                                     background: '#ffc107',
+                                     borderRadius: '50%',
+                                     border: '2px solid white',
+                                     boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                   }}></div>
+                            </div>
                           </div>
-                          <p className="fw-medium fs-12 mb-1">New Tickets</p>
-                          <h4>120</h4>
+                          <div>
+                            <p className="fw-semibold fs-13 mb-1 text-muted" style={{ letterSpacing: '0.5px' }}>
+                              New Tickets
+                            </p>
+                            <h3 className="fw-bold mb-0 text-warning" style={{ 
+                              fontSize: '2rem',
+                              textShadow: '0 2px 4px rgba(255, 193, 7, 0.1)'
+                            }}>
+                              {statistics.totalTickets}
+                            </h3>
+                          </div>
                         </div>
                       </div>
-                      <div className="col-6 text-end d-flex">
-                        <div className="d-flex flex-column justify-content-between align-items-end">
-                          <span className="badge bg-transparent-purple d-inline-flex align-items-center mb-3">
-                            <i className="ti ti-arrow-wave-right-down me-1" />
-                            +19.01%
-                          </span>
-                          <ReactApexChart
-                            options={Areachart}
-                            series={Areachart.series}
-                            type="bar"
-                            height={70}
-                          />
+                      <div className="col-6">
+                        <div className="d-flex flex-column align-items-end h-100 justify-content-between">
+                          <div className="mb-3">
+                            <span className="badge d-inline-flex align-items-center px-3 py-2" 
+                                  style={{
+                                    background: 'linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%)',
+                                    color: 'white',
+                                    borderRadius: '20px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    boxShadow: '0 4px 15px rgba(23, 162, 184, 0.3)',
+                                    border: 'none'
+                                  }}>
+                              <i className={`ti ${getTrendIcon(statistics.growthPercentages.totalTickets)} me-1 fs-12`} />
+                              {formatPercentage(statistics.growthPercentages.totalTickets)}
+                            </span>
+                          </div>
+                          <div className="w-100" style={{ height: '70px' }}>
+                            <ReactApexChart
+                              options={Areachart}
+                              series={Areachart.series}
+                              type="bar"
+                              height={70}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="col-xl-3 col-md-6 d-flex">
-                <div className="card flex-fill">
-                  <div className="card-body">
-                    <div className="row">
-                      <div className="col-6 d-flex">
-                        <div className="flex-fill">
-                          <div className="border border-dashed border-purple rounded-circle d-inline-flex align-items-center justify-content-center p-1 mb-3">
-                            <span className="avatar avatar-lg avatar-rounded bg-transparent-purple">
-                              <i className="ti ti-folder-open fs-20" />
-                            </span>
+              <div className="col-xl-4 col-md-6 d-flex">
+                <div className="card flex-fill shadow-sm border-0" style={{ 
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8f0ff 100%)',
+                  borderRadius: '16px',
+                  transition: 'all 0.3s ease',
+                  border: '1px solid rgba(111, 66, 193, 0.1)'
+                }}>
+                  <div className="card-body p-4">
+                    <div className="row align-items-center">
+                      <div className="col-6">
+                        <div className="d-flex flex-column">
+                          <div className="position-relative mb-3">
+                            <div className="d-inline-flex align-items-center justify-content-center" 
+                                 style={{
+                                   width: '60px',
+                                   height: '60px',
+                                   background: 'linear-gradient(135deg, #6f42c1 0%, #e83e8c 100%)',
+                                   borderRadius: '20px',
+                                   boxShadow: '0 8px 25px rgba(111, 66, 193, 0.3)',
+                                   position: 'relative'
+                                 }}>
+                              <i className="ti ti-folder-open fs-24 text-white" />
+                              <div className="position-absolute top-0 start-100 translate-middle" 
+                                   style={{
+                                     width: '12px',
+                                     height: '12px',
+                                     background: '#6f42c1',
+                                     borderRadius: '50%',
+                                     border: '2px solid white',
+                                     boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                   }}></div>
+                            </div>
                           </div>
-                          <p className="fw-medium fs-12 mb-1">Open Tickets</p>
-                          <h4>60</h4>
+                          <div>
+                            <p className="fw-semibold fs-13 mb-1 text-muted" style={{ letterSpacing: '0.5px' }}>
+                              Open Tickets
+                            </p>
+                            <h3 className="fw-bold mb-0 text-purple" style={{ 
+                              fontSize: '2rem',
+                              textShadow: '0 2px 4px rgba(111, 66, 193, 0.1)'
+                            }}>
+                              {statistics.openTickets}
+                            </h3>
+                          </div>
                         </div>
                       </div>
-                      <div className="col-6 text-end d-flex">
-                        <div className="d-flex flex-column justify-content-between align-items-end">
-                          <span className="badge bg-transparent-dark text-dark d-inline-flex align-items-center mb-3">
-                            <i className="ti ti-arrow-wave-right-down me-1" />
-                            +19.01%
-                          </span>
-                          <ReactApexChart
-                            options={Areachart1}
-                            series={Areachart1.series}
-                            type="bar"
-                            height={70}
-                          />
+                      <div className="col-6">
+                        <div className="d-flex flex-column align-items-end h-100 justify-content-between">
+                          <div className="mb-3">
+                            <span className="badge d-inline-flex align-items-center px-3 py-2" 
+                                  style={{
+                                    background: 'linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%)',
+                                    color: 'white',
+                                    borderRadius: '20px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    boxShadow: '0 4px 15px rgba(23, 162, 184, 0.3)',
+                                    border: 'none'
+                                  }}>
+                              <i className={`ti ${getTrendIcon(statistics.growthPercentages.openTickets)} me-1 fs-12`} />
+                              {formatPercentage(statistics.growthPercentages.openTickets)}
+                            </span>
+                          </div>
+                          <div className="w-100" style={{ height: '70px' }}>
+                            <ReactApexChart
+                              options={Areachart1}
+                              series={Areachart1.series}
+                              type="bar"
+                              height={70}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="col-xl-3 col-md-6 d-flex">
-                <div className="card flex-fill">
-                  <div className="card-body">
-                    <div className="row">
-                      <div className="col-6 d-flex">
-                        <div className="flex-fill">
-                          <div className="border border-dashed border-success rounded-circle d-inline-flex align-items-center justify-content-center p-1 mb-3">
-                            <span className="avatar avatar-lg avatar-rounded bg-success-transparent">
-                              <i className="ti ti-checks fs-20" />
+              <div className="col-xl-4 col-md-6 d-flex">
+                <div className="card flex-fill shadow-sm border-0" style={{ 
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8fffe 100%)',
+                  borderRadius: '16px',
+                  transition: 'all 0.3s ease',
+                  border: '1px solid rgba(25, 135, 84, 0.1)'
+                }}>
+                  <div className="card-body p-4">
+                    <div className="row align-items-center">
+                      <div className="col-6">
+                        <div className="d-flex flex-column">
+                          <div className="position-relative mb-3">
+                            <div className="d-inline-flex align-items-center justify-content-center" 
+                                 style={{
+                                   width: '60px',
+                                   height: '60px',
+                                   background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+                                   borderRadius: '20px',
+                                   boxShadow: '0 8px 25px rgba(40, 167, 69, 0.3)',
+                                   position: 'relative'
+                                 }}>
+                              <i className="ti ti-checks fs-24 text-white" />
+                              <div className="position-absolute top-0 start-100 translate-middle" 
+                                   style={{
+                                     width: '12px',
+                                     height: '12px',
+                                     background: '#28a745',
+                                     borderRadius: '50%',
+                                     border: '2px solid white',
+                                     boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                   }}></div>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="fw-semibold fs-13 mb-1 text-muted" style={{ letterSpacing: '0.5px' }}>
+                              Solved Tickets
+                            </p>
+                            <h3 className="fw-bold mb-0 text-success" style={{ 
+                              fontSize: '2rem',
+                              textShadow: '0 2px 4px rgba(40, 167, 69, 0.1)'
+                            }}>
+                              {statistics.resolvedTickets}
+                            </h3>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-6">
+                        <div className="d-flex flex-column align-items-end h-100 justify-content-between">
+                          <div className="mb-3">
+                            <span className="badge d-inline-flex align-items-center px-3 py-2" 
+                                  style={{
+                                    background: 'linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%)',
+                                    color: 'white',
+                                    borderRadius: '20px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    boxShadow: '0 4px 15px rgba(23, 162, 184, 0.3)',
+                                    border: 'none'
+                                  }}>
+                              <i className={`ti ${getTrendIcon(statistics.growthPercentages.resolvedTickets)} me-1 fs-12`} />
+                              {formatPercentage(statistics.growthPercentages.resolvedTickets)}
                             </span>
                           </div>
-                          <p className="fw-medium fs-12 mb-1">Solved Tickets</p>
-                          <h4>50</h4>
-                        </div>
-                      </div>
-                      <div className="col-6 text-end d-flex">
-                        <div className="d-flex flex-column justify-content-between align-items-end">
-                          <span className="badge bg-info-transparent d-inline-flex align-items-center mb-3">
-                            <i className="ti ti-arrow-wave-right-down me-1" />
-                            +19.01%
-                          </span>
-                          <ReactApexChart
-                            options={Areachart2}
-                            series={Areachart2.series}
-                            type="bar"
-                            height={70}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="col-xl-3 col-md-6 d-flex">
-                <div className="card flex-fill">
-                  <div className="card-body">
-                    <div className="row">
-                      <div className="col-6 d-flex">
-                        <div className="flex-fill">
-                          <div className="border border-dashed border-info rounded-circle d-inline-flex align-items-center justify-content-center p-1 mb-3">
-                            <span className="avatar avatar-lg avatar-rounded bg-info-transparent">
-                              <i className="ti ti-progress-alert fs-20" />
-                            </span>
+                          <div className="w-100" style={{ height: '70px' }}>
+                            <ReactApexChart
+                              options={Areachart2}
+                              series={Areachart2.series}
+                              type="bar"
+                              height={70}
+                            />
                           </div>
-                          <p className="fw-medium fs-12 mb-1">
-                            Pending Tickets
-                          </p>
-                          <h4>10</h4>
-                        </div>
-                      </div>
-                      <div className="col-6 text-end d-flex">
-                        <div className="d-flex flex-column justify-content-between align-items-end">
-                          <span className="badge bg-secondary-transparent d-inline-flex align-items-center mb-3">
-                            <i className="ti ti-arrow-wave-right-down me-1" />
-                            +19.01%
-                          </span>
-                          <ReactApexChart
-                            options={Areachart3}
-                            series={Areachart3.series}
-                            type="bar"
-                            height={70}
-                          />
                         </div>
                       </div>
                     </div>

@@ -8,11 +8,13 @@ const path = require('path');
 const fileUpload = require('express-fileupload');
 // ✅ Import du modèle User
 const { User, UserRole } = require('./models/User');
+// ✅ Import de la configuration centralisée
+const config = require('./config');
 
 const app = express();
 
-// JWT Secret (in production, use environment variable)
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+// JWT Secret from centralized config
+const JWT_SECRET = config.security.jwtSecret;
 
 // 📊 Logging Helper Functions
 const logInfo = (message, data = null) => {
@@ -73,6 +75,15 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/user', require('./routes/userRoutes'));
 app.use('/api/company-profile', require('./routes/companyProfile'));
 app.use('/api/chat', require('./routes/chat'));
+app.use('/api/posts', require('./routes/postRoutes'));
+app.use('/api/user-management', require('./routes/userManagement'));
+
+app.use('/api/voice-calls', require('./routes/voiceCalls'));
+app.use('/api/events', require('./routes/events'));
+app.use('/api/notes', require('./routes/notes'));
+app.use('/api/obstacles', require('./routes/obstacles'));
+app.use('/api/tickets', require('./routes/tickets'));
+
 
 // 📝 Request Logging Middleware
 app.use((req, res, next) => {
@@ -428,6 +439,7 @@ app.post('/api/auth/signin', async (req, res) => {
       role: user.role,
       isActive: user.isActive,
       profilePhoto: user.profilePhoto,
+      avatar: user.avatar,
       lastLogin: new Date()
     };
 
@@ -476,6 +488,7 @@ app.get('/api/auth/verify', async (req, res) => {
       lastName: user.lastName,
       role: user.role,
       isActive: user.isActive,
+      avatar: user.avatar,
       profilePhoto: user.profilePhoto
     };
 
@@ -931,6 +944,44 @@ process.on('SIGINT', () => {
     logInfo('Connexion MongoDB fermée');
     process.exit(0);
   });
+});
+
+// 🔍 Diagnostic endpoint for checking connections
+app.get('/api/diagnostic/connections', (req, res) => {
+  try {
+    // Get socket manager instance from global
+    const io = require('./server').io;
+    const socketManager = io.socketManager;
+    
+    if (socketManager) {
+      res.json({
+        success: true,
+        data: {
+          message: 'Backend is running',
+          timestamp: new Date().toISOString(),
+          port: process.env.PORT || 5000,
+          totalConnectedUsers: socketManager.connectedUsers.size,
+          connectedUsers: Array.from(socketManager.connectedUsers.keys()),
+          socketConnections: socketManager.userSockets.size
+        }
+      });
+    } else {
+      res.json({
+        success: true,
+        data: {
+          message: 'Backend is running (Socket manager not available)',
+          timestamp: new Date().toISOString(),
+          port: process.env.PORT || 5000
+        }
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error getting connection info',
+      error: error.message
+    });
+  }
 });
 
 // ✅ Export de l'app

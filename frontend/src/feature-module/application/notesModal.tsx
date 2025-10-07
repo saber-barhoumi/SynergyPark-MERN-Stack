@@ -1,4 +1,5 @@
 import React from "react";
+import NotesService from "../../services/notesService";
 import { Link } from "react-router-dom";
 import { DatePicker } from "antd";
 import CommonTagsInput from "../../core/common/Taginput";
@@ -7,6 +8,10 @@ import CommonTextEditor from "../../core/common/textEditor";
 
 const NotesModal = () => {
   const [tags, setTags] = React.useState<string[]>(["Pending", "Done"]);
+  const [title, setTitle] = React.useState<string>("");
+  const [priority, setPriority] = React.useState<string>("Medium");
+  const [content, setContent] = React.useState<string>("");
+  const [submitting, setSubmitting] = React.useState<boolean>(false);
   const optionsChoose = [
     { value: "Gifford", label: "Gifford" },
     { value: "Kathleen", label: "Kathleen" },
@@ -39,13 +44,25 @@ const NotesModal = () => {
             <i className="ti ti-x" />
           </button>
         </div>
-        <form >
+        <form onSubmit={async (e) => {
+          e.preventDefault();
+          try {
+            setSubmitting(true);
+            await NotesService.create({ title, content, priority, tags });
+            // simple reload to reflect new note in list (or could use event/callback)
+            window.location.reload();
+          } catch (err) {
+            console.error(err);
+          } finally {
+            setSubmitting(false);
+          }
+        }}>
           <div className="modal-body">
             <div className="row">
               <div className="col-12">
                 <div className="mb-3">
                   <label className="form-label">Note Title</label>
-                  <input type="text" className="form-control" />
+                  <input type="text" className="form-control" value={title} onChange={(e)=>setTitle(e.target.value)} />
                 </div>
               </div>
               <div className="col-12">
@@ -75,6 +92,7 @@ const NotesModal = () => {
                   <CommonSelect
                       className="select"
                       options={optionsPriority}
+                      onChange={(opt:any)=> setPriority(opt?.value || 'Medium')}
                     />
                 </div>
               </div>
@@ -101,7 +119,7 @@ const NotesModal = () => {
               <div className="col-lg-12">
                 <div className="mb-0 summer-description-box notes-summernote">
                   <label className="form-label">Descriptions</label>
-                  <CommonTextEditor/>
+                  <CommonTextEditor onChange={(val:string)=> setContent(val)} defaultValue={content}/>
                   <small>Maximum 60 Characters</small>
                 </div>
               </div>
@@ -115,8 +133,8 @@ const NotesModal = () => {
             >
               Cancel
             </button>
-            <button type="button" data-bs-dismiss="modal" className="btn btn-primary">
-              Submit
+            <button type="submit" data-bs-dismiss="modal" className="btn btn-primary" disabled={submitting || !title || !content}>
+              {submitting ? 'Saving...' : 'Submit'}
             </button>
           </div>
         </form>

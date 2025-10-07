@@ -1,8 +1,6 @@
 import React from "react";
+import NotesService from "../../services/notesService";
 import { Link } from "react-router-dom";
-import Slider from "react-slick";
-import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
 import NotesModal from "./notesModal";
 import { all_routes } from "../router/all_routes";
 import CommonSelect from "../../core/common/commonSelect";
@@ -11,6 +9,89 @@ import ImageWithBasePath from "../../core/common/imageWithBasePath";
 
 const Notes = () => {
   const routes = all_routes;
+  const [myNotes, setMyNotes] = React.useState<any[]>([]);
+  const [loadingNotes, setLoadingNotes] = React.useState<boolean>(false);
+  const [errorNotes, setErrorNotes] = React.useState<string>("");
+  const [deleteModal, setDeleteModal] = React.useState<boolean>(false);
+  const [noteToDelete, setNoteToDelete] = React.useState<string | null>(null);
+  const [viewModal, setViewModal] = React.useState<boolean>(false);
+  const [noteToView, setNoteToView] = React.useState<any>(null);
+  const [editModal, setEditModal] = React.useState<boolean>(false);
+  const [noteToEdit, setNoteToEdit] = React.useState<any>(null);
+  const [editForm, setEditForm] = React.useState({
+    title: '',
+    content: '',
+    priority: 'Medium'
+  });
+
+  React.useEffect(() => {
+    const fetchNotes = async () => {
+      try {
+        setLoadingNotes(true);
+        const res = await NotesService.listMyNotes();
+        setMyNotes(res?.data || []);
+      } catch (e: any) {
+        setErrorNotes(e?.message || "Failed to load notes");
+      } finally {
+        setLoadingNotes(false);
+      }
+    };
+    fetchNotes();
+  }, []);
+
+  const handleDeleteNote = async () => {
+    if (!noteToDelete) return;
+    
+    try {
+      await NotesService.delete(noteToDelete);
+      setMyNotes(prevNotes => prevNotes.filter(note => note._id !== noteToDelete));
+      setDeleteModal(false);
+      setNoteToDelete(null);
+    } catch (error: any) {
+      console.error('Failed to delete note:', error);
+      setErrorNotes(error?.message || "Failed to delete note");
+    }
+  };
+
+  const openDeleteModal = (noteId: string) => {
+    setNoteToDelete(noteId);
+    setDeleteModal(true);
+  };
+
+  const openViewModal = (note: any) => {
+    setNoteToView(note);
+    setViewModal(true);
+  };
+
+  const openEditModal = (note: any) => {
+    setNoteToEdit(note);
+    setEditForm({
+      title: note.title || '',
+      content: note.content || '',
+      priority: note.priority || 'Medium'
+    });
+    setEditModal(true);
+  };
+
+  const handleEditNote = async () => {
+    if (!noteToEdit) return;
+    
+    try {
+      await (NotesService as any).update(noteToEdit._id, editForm);
+      setMyNotes(prevNotes => 
+        prevNotes.map(note => 
+          note._id === noteToEdit._id 
+            ? { ...note, ...editForm }
+            : note
+        )
+      );
+      setEditModal(false);
+      setNoteToEdit(null);
+    } catch (error: any) {
+      console.error('Failed to update note:', error);
+      setErrorNotes(error?.message || "Failed to update note");
+    }
+  };
 
   const optionsChoose = [
     { value: "Bulk Actions", label: "Bulk Actions" },
@@ -24,42 +105,8 @@ const Notes = () => {
     { value: "Last Modified by me", label: "Last Modified by me" }
   ];
 
-  const settings = {
-    dots: false,
-    autoplay: false,
-    slidesToShow: 3,
-    margin: 24,
-    speed: 500,
-    responsive: [
-      {
-        breakpoint: 992,
-        settings: {
-          slidesToShow: 2,
-        },
-      },
-      {
-        breakpoint: 800,
-        settings: {
-          slidesToShow: 2,
-        },
-      },
-      {
-        breakpoint: 776,
-        settings: {
-          slidesToShow: 2,
-        },
-      },
-      {
-        breakpoint: 567,
-        settings: {
-          slidesToShow: 2,
-        },
-      },
-    ],
-  };
   return (
     <>
-      <>
         {/* Page wrapper */}
         <div className="page-wrapper">
           <div className="content pb-4">
@@ -157,7 +204,7 @@ const Notes = () => {
                         aria-selected="true"
                       >
                         <i className="ti ti-inbox me-2" />
-                        All Notes<span className="ms-2">1</span>
+                        All Notes<span className="ms-2">{myNotes.length}</span>
                       </button>
                       <button
                         className="d-flex text-start align-items-center fw-medium fs-15 nav-link mb-1"
@@ -292,2226 +339,143 @@ const Notes = () => {
                           </div>
                         </div>
                         <div className="col-md-12">
-
-                          <Slider {...settings} className="notes-slider owl-carousel">
-                            <div className="card rounded-3 mb-0">
-                              <div className="card-body p-4">
-                                <div className="d-flex align-items-center justify-content-between">
-                                  <span className="badge bg-outline-warning d-inline-flex align-items-center">
-                                    <i className="fas fa-circle fs-6 me-1" />
-                                    Medium
-                                  </span>
-                                  <div>
-                                    <Link
-                                      to="#"
-                                      data-bs-toggle="dropdown"
-                                      aria-expanded="false"
-                                    >
-                                      <i className="fas fa-ellipsis-v" />
-                                    </Link>
-                                    <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#edit-note-units"
-                                      >
-                                        <span>
-                                          <i data-feather="edit" />
+                          {loadingNotes && (
+                            <div className="row">
+                              <div className="col-12">
+                                <div className="card rounded-3 mb-0">
+                                  <div className="card-body p-4 text-center">Loading...</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {!loadingNotes && myNotes.length === 0 && (
+                            <div className="row">
+                              <div className="col-12">
+                                <div className="card rounded-3 mb-0">
+                                  <div className="card-body p-4 text-center">No notes yet</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {!loadingNotes && myNotes.length > 0 && (
+                            <div className="row g-3">
+                              {myNotes.map((n) => (
+                                <div className="col-lg-4 col-md-6 col-sm-6" key={n._id}>
+                                  <div className="card rounded-3 mb-0 h-100">
+                                    <div className="card-body p-4 d-flex flex-column">
+                                      <div className="d-flex align-items-center justify-content-between mb-3">
+                                        <span className={`badge d-inline-flex align-items-center ${n.priority === 'High' ? 'bg-outline-success' : n.priority === 'Medium' ? 'bg-outline-warning' : 'bg-outline-danger'}`}>
+                                          <i className="fas fa-circle fs-6 me-1" />
+                                          {n.priority || 'Medium'}
                                         </span>
-                                        Edit
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#delete_modal"
-                                      >
-                                        <span>
-                                          <i data-feather="trash-2" />
-                                        </span>
-                                        Delete
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                      >
-                                        <span>
-                                          <i data-feather="star" />
-                                        </span>
-                                        Not Important
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#view-note-units"
-                                      >
-                                        <span>
-                                          <i data-feather="eye" />
-                                        </span>
-                                        View
-                                      </Link>
+                                        <div>
+                                          <Link
+                                            to="#"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false"
+                                          >
+                                            <i className="fas fa-ellipsis-v" />
+                                          </Link>
+                                          <div className="dropdown-menu notes-menu dropdown-menu-end">
+                                            <button
+                                              className="dropdown-item"
+                                              onClick={() => openEditModal(n)}
+                                              style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
+                                            >
+                                              <span>
+                                                <i data-feather="edit" />
+                                              </span>
+                                              Edit
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              onClick={() => openDeleteModal(n._id)}
+                                              style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
+                                            >
+                                              <span>
+                                                <i data-feather="trash-2" />
+                                              </span>
+                                              Delete
+                                            </button>
+                                            <Link
+                                              to="#"
+                                              className="dropdown-item"
+                                            >
+                                              <span>
+                                                <i data-feather="star" />
+                                              </span>
+                                              Not Important
+                                            </Link>
+                                            <button
+                                              className="dropdown-item"
+                                              onClick={() => openViewModal(n)}
+                                              style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
+                                            >
+                                              <span>
+                                                <i data-feather="eye" />
+                                              </span>
+                                              View
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="flex-grow-1">
+                                        <h5 className="text-truncate mb-2">
+                                          <Link to="#" className="text-decoration-none">{n.title}</Link>
+                                        </h5>
+                                        <p className="mb-3 d-flex align-items-center text-dark small">
+                                          <i className="ti ti-calendar me-1" />
+                                          {new Date(n.createdAt).toLocaleDateString()}
+                                        </p>
+                                        <p className="text-muted small" style={{ 
+                                          display: '-webkit-box',
+                                          WebkitLineClamp: 3,
+                                          WebkitBoxOrient: 'vertical',
+                                          overflow: 'hidden'
+                                        }}>
+                                          {n.content}
+                                        </p>
+                                      </div>
+                                      <div className="d-flex align-items-center justify-content-between border-top pt-3 mt-3">
+                                        <div className="d-flex align-items-center">
+                                          <Link
+                                            to="#"
+                                            className="avatar avatar-md me-2"
+                                          >
+                                            <ImageWithBasePath
+                                              src="./assets/img/profiles/avatar-01.jpg"
+                                              alt="Profile"
+                                              className="img-fluid rounded-circle"
+                                            />
+                                          </Link>
+                                          <span className="text-info d-flex align-items-center small">
+                                            <i className="fas fa-square square-rotate fs-10 me-1" />
+                                            {n?.companyId?.companyName || 'Personal'}
+                                          </span>
+                                        </div>
+                                        <div className="d-flex align-items-center">
+                                          <Link to="#" className="me-2">
+                                            <span>
+                                              <i className="fas fa-star text-warning" />
+                                            </span>
+                                          </Link>
+                                          <Link to="#">
+                                            <span>
+                                              <i className="ti ti-trash text-danger" />
+                                            </span>
+                                          </Link>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                                <div className="my-3">
-                                  <h5 className="text-truncate mb-1">
-                                    <Link to="#">
-                                      Plan a trip to another country
-                                    </Link>
-                                  </h5>
-                                  <p className="mb-3 d-flex align-items-center text-dark">
-                                    <i className="ti ti-calendar me-1" />
-                                    20 Jan 2024
-                                  </p>
-                                  <p className="text-truncate line-clamb-2 text-wrap">
-                                    Space, the final frontier. These are the voyages
-                                    of the Starship Enterprise.
-                                  </p>
-                                </div>
-                                <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                                  <div className="d-flex align-items-center">
-                                    <Link
-                                      to="#"
-                                      className="avatar avatar-md me-2"
-                                    >
-                                      <ImageWithBasePath
-                                        src="./assets/img/profiles/avatar-01.jpg"
-                                        alt="Profile"
-                                        className="img-fluid rounded-circle"
-                                      />
-                                    </Link>
-                                    <span className="text-info d-flex align-items-center">
-                                      <i className="fas fa-square square-rotate fs-10 me-1" />
-                                      Personal
-                                    </span>
-                                  </div>
-                                  <div className="d-flex align-items-center">
-                                    <Link to="#" className="me-2">
-                                      <span>
-                                        <i className="fas fa-star text-warning" />
-                                      </span>
-                                    </Link>
-                                    <Link to="#">
-                                      <span>
-                                        <i className="ti ti-trash text-danger" />
-                                      </span>
-                                    </Link>
-                                  </div>
-                                </div>
-                              </div>
+                              ))}
                             </div>
-                            <div className="card rounded-3 mb-0">
-                              <div className="card-body p-4">
-                                <div className="d-flex align-items-center justify-content-between">
-                                  <span className="badge bg-outline-danger d-inline-flex align-items-center">
-                                    <i className="fas fa-circle fs-6 me-1" />
-                                    Low
-                                  </span>
-                                  <div>
-                                    <Link
-                                      to="#"
-                                      data-bs-toggle="dropdown"
-                                      aria-expanded="false"
-                                    >
-                                      <i className="fas fa-ellipsis-v" />
-                                    </Link>
-                                    <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#edit-note-units"
-                                      >
-                                        <span>
-                                          <i data-feather="edit" />
-                                        </span>
-                                        Edit
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#delete_modal"
-                                      >
-                                        <span>
-                                          <i data-feather="trash-2" />
-                                        </span>
-                                        Delete
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                      >
-                                        <span>
-                                          <i data-feather="star" />
-                                        </span>
-                                        Not Important
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#view-note-units"
-                                      >
-                                        <span>
-                                          <i data-feather="eye" />
-                                        </span>
-                                        View
-                                      </Link>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="my-3">
-                                  <h5 className="text-truncate mb-1">
-                                    <Link to="#">
-                                      Improve touch typing
-                                    </Link>
-                                  </h5>
-                                  <p className="mb-3 d-flex align-items-center text-dark">
-                                    <i className="ti ti-calendar me-1" />
-                                    22 Jan 2024
-                                  </p>
-                                  <p className="text-truncate line-clamb-2 text-wrap">
-                                    Well, the way they make shows is, they make one
-                                    show.
-                                  </p>
-                                </div>
-                                <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                                  <div className="d-flex align-items-center">
-                                    <Link
-                                      to="#"
-                                      className="avatar avatar-md me-2"
-                                    >
-                                      <ImageWithBasePath
-                                        src="./assets/img/profiles/avatar-02.jpg"
-                                        alt="Profile"
-                                        className="img-fluid rounded-circle"
-                                      />
-                                    </Link>
-                                    <span className="text-success d-flex align-items-center">
-                                      <i className="fas fa-square square-rotate fs-10 me-1" />
-                                      Work
-                                    </span>
-                                  </div>
-                                  <div className="d-flex align-items-center">
-                                    <Link to="#" className="me-2">
-                                      <span>
-                                        <i className="fas fa-star text-warning" />
-                                      </span>
-                                    </Link>
-                                    <Link to="#">
-                                      <span>
-                                        <i className="ti ti-trash text-danger" />
-                                      </span>
-                                    </Link>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="card rounded-3 mb-0">
-                              <div className="card-body p-4">
-                                <div className="d-flex align-items-center justify-content-between">
-                                  <span className="badge bg-outline-danger d-inline-flex align-items-center">
-                                    <i className="fas fa-circle fs-6 me-1" />
-                                    Low
-                                  </span>
-                                  <div>
-                                    <Link
-                                      to="#"
-                                      data-bs-toggle="dropdown"
-                                      aria-expanded="false"
-                                    >
-                                      <i className="fas fa-ellipsis-v" />
-                                    </Link>
-                                    <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#edit-note-units"
-                                      >
-                                        <span>
-                                          <i data-feather="edit" />
-                                        </span>
-                                        Edit
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#delete_modal"
-                                      >
-                                        <span>
-                                          <i data-feather="trash-2" />
-                                        </span>
-                                        Delete
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                      >
-                                        <span>
-                                          <i data-feather="star" />
-                                        </span>
-                                        Not Important
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#view-note-units"
-                                      >
-                                        <span>
-                                          <i data-feather="eye" />
-                                        </span>
-                                        View
-                                      </Link>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="my-3">
-                                  <h5 className="text-truncate mb-1">
-                                    <Link to="#">
-                                      Learn calligraphy
-                                    </Link>
-                                  </h5>
-                                  <p className="mb-3 d-flex align-items-center text-dark">
-                                    <i className="ti ti-calendar me-1" />
-                                    24 Jan 2024
-                                  </p>
-                                  <p className="text-truncate line-clamb-2 text-wrap">
-                                    Calligraphy, the art of beautiful handwriting. The
-                                    term may derive from the Greek words.{" "}
-                                  </p>
-                                </div>
-                                <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                                  <div className="d-flex align-items-center">
-                                    <Link
-                                      to="#"
-                                      className="avatar avatar-md me-2"
-                                    >
-                                      <ImageWithBasePath
-                                        src="./assets/img/profiles/avatar-03.jpg"
-                                        alt="Profile"
-                                        className="img-fluid rounded-circle"
-                                      />
-                                    </Link>
-                                    <span className="text-info d-flex align-items-center">
-                                      <i className="fas fa-square square-rotate fs-10 me-1" />
-                                      Social
-                                    </span>
-                                  </div>
-                                  <div className="d-flex align-items-center">
-                                    <Link to="#" className="me-2">
-                                      <span>
-                                        <i className="fas fa-star text-warning" />
-                                      </span>
-                                    </Link>
-                                    <Link to="#">
-                                      <span>
-                                        <i className="ti ti-trash text-danger" />
-                                      </span>
-                                    </Link>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="card rounded-3 mb-0">
-                              <div className="card-body p-4">
-                                <div className="d-flex align-items-center justify-content-between">
-                                  <span className="badge bg-outline-warning d-inline-flex align-items-center">
-                                    <i className="fas fa-circle fs-6 me-1" />
-                                    Medium
-                                  </span>
-                                  <div>
-                                    <Link
-                                      to="#"
-                                      data-bs-toggle="dropdown"
-                                      aria-expanded="false"
-                                    >
-                                      <i className="fas fa-ellipsis-v" />
-                                    </Link>
-                                    <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#edit-note-units"
-                                      >
-                                        <span>
-                                          <i data-feather="edit" />
-                                        </span>
-                                        Edit
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#delete_modal"
-                                      >
-                                        <span>
-                                          <i data-feather="trash-2" />
-                                        </span>
-                                        Delete
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                      >
-                                        <span>
-                                          <i data-feather="star" />
-                                        </span>
-                                        Not Important
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#view-note-units"
-                                      >
-                                        <span>
-                                          <i data-feather="eye" />
-                                        </span>
-                                        View
-                                      </Link>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="my-3">
-                                  <h5 className="text-truncate mb-1">
-                                    <Link to="#">
-                                      Plan a trip to another country
-                                    </Link>
-                                  </h5>
-                                  <p className="mb-3 d-flex align-items-center text-dark">
-                                    <i className="ti ti-calendar me-1" />
-                                    25 Jan 2024
-                                  </p>
-                                  <p className="text-truncate line-clamb-2 text-wrap">
-                                    Space, the final frontier. These are the voyages
-                                    of the Starship Enterprise.
-                                  </p>
-                                </div>
-                                <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                                  <div className="d-flex align-items-center">
-                                    <Link
-                                      to="#"
-                                      className="avatar avatar-md me-2"
-                                    >
-                                      <ImageWithBasePath
-                                        src="./assets/img/profiles/avatar-01.jpg"
-                                        alt="Profile"
-                                        className="img-fluid rounded-circle"
-                                      />
-                                    </Link>
-                                    <span className="text-info d-flex align-items-center">
-                                      <i className="fas fa-square square-rotate fs-10 me-1" />
-                                      Personal
-                                    </span>
-                                  </div>
-                                  <div className="d-flex align-items-center">
-                                    <Link to="#" className="me-2">
-                                      <span>
-                                        <i className="fas fa-star text-warning" />
-                                      </span>
-                                    </Link>
-                                    <Link to="#">
-                                      <span>
-                                        <i className="ti ti-trash text-danger" />
-                                      </span>
-                                    </Link>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="card rounded-3 mb-0">
-                              <div className="card-body p-4">
-                                <div className="d-flex align-items-center justify-content-between">
-                                  <span className="badge bg-outline-danger d-inline-flex align-items-center">
-                                    <i className="fas fa-circle fs-6 me-1" />
-                                    Low
-                                  </span>
-                                  <div>
-                                    <Link
-                                      to="#"
-                                      data-bs-toggle="dropdown"
-                                      aria-expanded="false"
-                                    >
-                                      <i className="fas fa-ellipsis-v" />
-                                    </Link>
-                                    <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#edit-note-units"
-                                      >
-                                        <span>
-                                          <i data-feather="edit" />
-                                        </span>
-                                        Edit
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#delete_modal"
-                                      >
-                                        <span>
-                                          <i data-feather="trash-2" />
-                                        </span>
-                                        Delete
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                      >
-                                        <span>
-                                          <i data-feather="star" />
-                                        </span>
-                                        Not Important
-                                      </Link>
-                                      <Link
-                                        to="#"
-                                        className="dropdown-item"
-                                        data-bs-toggle="modal" data-inert={true}
-                                        data-bs-target="#view-note-units"
-                                      >
-                                        <span>
-                                          <i data-feather="eye" />
-                                        </span>
-                                        View
-                                      </Link>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="my-3">
-                                  <h5 className="text-truncate mb-1">
-                                    <Link to="#">
-                                      Improve touch typing
-                                    </Link>
-                                  </h5>
-                                  <p className="mb-3 d-flex align-items-center text-dark">
-                                    <i className="ti ti-calendar me-1" />
-                                    26 Jan 2024
-                                  </p>
-                                  <p className="text-truncate line-clamb-2 text-wrap">
-                                    Well, the way they make shows is, they make one
-                                    show.
-                                  </p>
-                                </div>
-                                <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                                  <div className="d-flex align-items-center">
-                                    <Link
-                                      to="#"
-                                      className="avatar avatar-md me-2"
-                                    >
-                                      <ImageWithBasePath
-                                        src="./assets/img/profiles/avatar-02.jpg"
-                                        alt="Profile"
-                                        className="img-fluid rounded-circle"
-                                      />
-                                    </Link>
-                                    <span className="text-success d-flex align-items-center">
-                                      <i className="fas fa-square square-rotate fs-10 me-1" />
-                                      Work
-                                    </span>
-                                  </div>
-                                  <div className="d-flex align-items-center">
-                                    <Link to="#" className="me-2">
-                                      <span>
-                                        <i className="fas fa-star text-warning" />
-                                      </span>
-                                    </Link>
-                                    <Link to="#">
-                                      <span>
-                                        <i className="ti ti-trash text-danger" />
-                                      </span>
-                                    </Link>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </Slider>
+                          )}
                         </div>
                       </div>
                     </div>
-                    <div className="row">
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-success d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                High
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">Backup Files EOD</Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                20 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Project files should be took backup before end of the
-                                day.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-05.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-info d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Personal
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-danger d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                Low
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">Download Server Logs</Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                25 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Server log is a text document that contains a record
-                                of all activity.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-06.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-success d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Work
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-warning d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                Medium
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">
-                                  Team meet at Starbucks
-                                </Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                26 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Meeting all teamets at Starbucks for identifying them
-                                all.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-07.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-warning d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Social
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-success d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                High
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">
-                                  Create a compost pile
-                                </Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                27 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Compost pile refers to fruit and vegetable scraps,
-                                used tea, coffee grounds etc..
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-08.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-warning d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Social
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-danger d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                Low
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">
-                                  Take a hike at a local park
-                                </Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                28 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Hiking involves a long energetic walk in a natural
-                                environment.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-09.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-info d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Personal
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-info d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                medium
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">
-                                  Research a topic interested
-                                </Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                28 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Research a topic interested by listen actively and
-                                attentively.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-10.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-success d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Work
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className="tab-pane fade"
-                    id="v-pills-messages"
-                    role="tabpanel"
-                    aria-labelledby="v-pills-messages-tab"
-                  >
-                    <div className="row">
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-success d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                High
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">Backup Files EOD</Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                20 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Project files should be took backup before end of the
-                                day.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-05.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-info d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Personal
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-danger d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                Low
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">Download Server Logs</Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                25 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Server log is a text document that contains a record
-                                of all activity.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-06.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-success d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Work
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-warning d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                Medium
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">
-                                  Team meet at Starbucks
-                                </Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                26 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Meeting all teamets at Starbucks for identifying them
-                                all.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-07.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-warning d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Social
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-success d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                High
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">
-                                  Create a compost pile
-                                </Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                27 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Compost pile refers to fruit and vegetable scraps,
-                                used tea, coffee grounds etc..
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-08.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-warning d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Social
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-danger d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                Low
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">
-                                  Take a hike at a local park
-                                </Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                28 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Hiking involves a long energetic walk in a natural
-                                environment.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-09.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-info d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Personal
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-info d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                medium
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">
-                                  Research a topic interested
-                                </Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                28 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Research a topic interested by listen actively and
-                                attentively.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-10.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-success d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Work
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className="tab-pane fade"
-                    id="v-pills-settings"
-                    role="tabpanel"
-                    aria-labelledby="v-pills-settings-tab"
-                  >
-                    <div className="row">
-                      <div className="col-12 d-flex align-items-center justify-content-end">
-                        <Link to="#" className="btn btn-danger mb-4">
-                          <span>
-                            {" "}
-                            <i className="ti ti-trash f-20 me-2" />{" "}
-                          </span>
-                          Restore all
-                        </Link>
-                      </div>
-                    </div>
-                    <div className="row">
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-success d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                High
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">
-                                  Create a compost pile
-                                </Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                27 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Compost pile refers to fruit and vegetable scraps,
-                                used tea, coffee grounds etc..
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-08.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-warning d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Social
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-danger d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                Low
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">
-                                  Take a hike at a local park
-                                </Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                28 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Hiking involves a long energetic walk in a natural
-                                environment.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-09.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-info d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Personal
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 d-flex">
-                        <div className="card rounded-3 mb-4 flex-fill">
-                          <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <span className="badge bg-outline-info d-inline-flex align-items-center">
-                                <i className="fas fa-circle fs-6 me-1" />
-                                medium
-                              </span>
-                              <div>
-                                <Link
-                                  to="#"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="fas fa-ellipsis-v" />
-                                </Link>
-                                <div className="dropdown-menu notes-menu dropdown-menu-end">
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#edit-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="edit" />
-                                    </span>
-                                    Edit
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#delete_modal"
-                                  >
-                                    <span>
-                                      <i data-feather="trash-2" />
-                                    </span>
-                                    Delete
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                  >
-                                    <span>
-                                      <i data-feather="star" />
-                                    </span>
-                                    Not Important
-                                  </Link>
-                                  <Link
-                                    to="#"
-                                    className="dropdown-item"
-                                    data-bs-toggle="modal" data-inert={true}
-                                    data-bs-target="#view-note-units"
-                                  >
-                                    <span>
-                                      <i data-feather="eye" />
-                                    </span>
-                                    View
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="my-3">
-                              <h5 className="text-truncate mb-1">
-                                <Link to="#">
-                                  Research a topic interested
-                                </Link>
-                              </h5>
-                              <p className="mb-3 d-flex align-items-center text-dark">
-                                <i className="ti ti-calendar me-1" />
-                                28 Jan 2024
-                              </p>
-                              <p className="text-truncate line-clamb-2 text-wrap">
-                                Research a topic interested by listen actively and
-                                attentively.
-                              </p>
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between border-top pt-3">
-                              <div className="d-flex align-items-center">
-                                <Link
-                                  to="#"
-                                  className="avatar avatar-md me-2"
-                                >
-                                  <ImageWithBasePath
-                                    src="./assets/img/profiles/avatar-10.jpg"
-                                    alt="Profile"
-                                    className="img-fluid rounded-circle"
-                                  />
-                                </Link>
-                                <span className="text-success d-flex align-items-center">
-                                  <i className="fas fa-square square-rotate fs-10 me-1" />
-                                  Work
-                                </span>
-                              </div>
-                              <div className="d-flex align-items-center">
-                                <Link to="#" className="me-2">
-                                  <span>
-                                    <i className="fas fa-star text-warning" />
-                                  </span>
-                                </Link>
-                                <Link to="#">
-                                  <span>
-                                    <i className="ti ti-trash text-danger" />
-                                  </span>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                </div>
                 </div>
                 <div className="row custom-pagination">
                   <div className="col-md-12">
@@ -2544,6 +508,8 @@ const Notes = () => {
               </div>
             </div>
           </div>
+
+
           <div className="footer d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
             <p className="mb-0">2014 - 2025 © SmartHR.</p>
             <p>
@@ -2555,11 +521,184 @@ const Notes = () => {
           </div>
         </div>
         {/* /Page wrapper */}
-      </>
 
       <NotesModal />
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal && (
+        <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Delete Note</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setDeleteModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p>Are you sure you want to delete this note? This action cannot be undone.</p>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setDeleteModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={handleDeleteNote}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Note Modal */}
+      {viewModal && noteToView && (
+        <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <div className="d-flex align-items-center">
+                  <h4 className="modal-title me-3">Notes</h4>
+                  <p className="text-info mb-0">{noteToView?.companyId?.companyName || 'Personal'}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close custom-btn-close"
+                  onClick={() => setViewModal(false)}
+                  aria-label="Close"
+                >
+                  <i className="ti ti-x"></i>
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="row">
+                  <div className="col-12">
+                    <div>
+                      <h4 className="mb-2">{noteToView.title}</h4>
+                      <p className="mb-3">{noteToView.content}</p>
+                      <div className="d-flex align-items-center justify-content-between">
+                        <span className={`badge d-inline-flex align-items-center ${noteToView.priority === 'High' ? 'bg-outline-danger' : noteToView.priority === 'Medium' ? 'bg-outline-warning' : 'bg-outline-success'}`}>
+                          <i className="fas fa-circle fs-6 me-1" />
+                          {noteToView.priority || 'Medium'}
+                        </span>
+                        <div className="d-flex align-items-center text-muted small">
+                          <i className="ti ti-calendar me-1" />
+                          {new Date(noteToView.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={() => setViewModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Note Modal */}
+      {editModal && noteToEdit && (
+        <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <div className="d-flex align-items-center">
+                  <h4 className="modal-title me-3">Edit Note</h4>
+                  <p className="text-info mb-0">{noteToEdit?.companyId?.companyName || 'Personal'}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close custom-btn-close"
+                  onClick={() => setEditModal(false)}
+                  aria-label="Close"
+                >
+                  <i className="ti ti-x"></i>
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="row">
+                  <div className="col-12">
+                    <form>
+                      <div className="mb-3">
+                        <label htmlFor="editTitle" className="form-label">Title</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          id="editTitle"
+                          value={editForm.title}
+                          onChange={(e) => setEditForm({...editForm, title: e.target.value})}
+                          placeholder="Enter note title"
+                        />
+                      </div>
+                      <div className="mb-3">
+                        <label htmlFor="editPriority" className="form-label">Priority</label>
+                        <select
+                          className="form-select"
+                          id="editPriority"
+                          value={editForm.priority}
+                          onChange={(e) => setEditForm({...editForm, priority: e.target.value})}
+                        >
+                          <option value="Low">Low</option>
+                          <option value="Medium">Medium</option>
+                          <option value="High">High</option>
+                        </select>
+                      </div>
+                      <div className="mb-3">
+                        <label htmlFor="editContent" className="form-label">Content</label>
+                        <textarea
+                          className="form-control"
+                          id="editContent"
+                          rows={6}
+                          value={editForm.content}
+                          onChange={(e) => setEditForm({...editForm, content: e.target.value})}
+                          placeholder="Enter note content"
+                        />
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setEditModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleEditNote}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
 
 export default Notes;
+                              

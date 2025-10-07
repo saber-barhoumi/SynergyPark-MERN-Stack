@@ -4,7 +4,9 @@ import { all_routes } from "../../router/all_routes";
 import CommonSelect from "../../../core/common/commonSelect";
 import CollapseHeader from "../../../core/common/collapse-header/collapse-header";
 import { useAuth } from "../../../contexts/AuthContext";
+import StartupProfileForm from "./StartupProfileForm";
 import { userAPI } from "../../../services/apiService";
+import API_BASE_URL from "../../../services/apiService";
 
 type PasswordField =
   | "oldPassword"
@@ -22,6 +24,12 @@ interface ProfileFormData {
   state: string;
   city: string;
   postalCode: string;
+  department: string;
+  position: string;
+  hireDate: string;
+  salary: string;
+  avatar: string;
+  cv: string;
 }
 
 interface PasswordFormData {
@@ -44,8 +52,21 @@ const Profile = () => {
     country: '',
     state: '',
     city: '',
-    postalCode: ''
+    postalCode: '',
+    department: '',
+    position: '',
+    hireDate: '',
+    salary: '',
+    avatar: '',
+    cv: ''
   });
+  const [cvUploading, setCvUploading] = useState(false);
+  const [emergencyContact, setEmergencyContact] = useState({
+    name: '',
+    phone: '',
+    relationship: ''
+  });
+  const [skillsText, setSkillsText] = useState('');
   
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
@@ -83,8 +104,20 @@ const Profile = () => {
         country: user.country || '',
         state: user.state || '',
         city: user.city || '',
-        postalCode: user.postalCode || ''
+        postalCode: user.postalCode || '',
+        department: user.department || '',
+        position: user.position || '',
+        hireDate: user.hireDate ? String(user.hireDate).substring(0,10) : '',
+        salary: user.salary != null ? String(user.salary) : '',
+        avatar: user.avatar || '',
+        cv: user.cv || ''
       });
+      setEmergencyContact({
+        name: user.emergencyContact?.name || '',
+        phone: user.emergencyContact?.phone || '',
+        relationship: user.emergencyContact?.relationship || ''
+      });
+      setSkillsText(Array.isArray(user.skills) ? user.skills.join(', ') : '');
     }
     loadProfile();
   }, [user]);
@@ -104,13 +137,49 @@ const Profile = () => {
           country: profile.country || '',
           state: profile.state || '',
           city: profile.city || '',
-          postalCode: profile.postalCode || ''
+          postalCode: profile.postalCode || '',
+          department: profile.department || '',
+          position: profile.position || '',
+          hireDate: profile.hireDate ? String(profile.hireDate).substring(0,10) : '',
+          salary: profile.salary != null ? String(profile.salary) : '',
+          avatar: profile.avatar || profile.profilePhoto || '',
+          cv: profile.cv || ''
         });
+        setEmergencyContact({
+          name: profile.emergencyContact?.name || '',
+          phone: profile.emergencyContact?.phone || '',
+          relationship: profile.emergencyContact?.relationship || ''
+        });
+        setSkillsText(Array.isArray(profile.skills) ? profile.skills.join(', ') : '');
       }
     } catch (err: any) {
       console.error('Failed to load profile:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setProfileError('');
+      setProfileSuccess('');
+      setCvUploading(true);
+      try {
+        if (user?.id) {
+          const res = await userAPI.uploadCv(user.id, file);
+          if (res.data?.success && res.data?.data?.cv) {
+            setProfileData((prev) => ({ ...prev, cv: res.data.data.cv }));
+            setProfileSuccess('CV uploaded successfully');
+          } else {
+            setProfileError(res.data?.message || 'Failed to upload CV');
+          }
+        }
+      } catch (err: any) {
+        setProfileError(err.response?.data?.message || 'Failed to upload CV');
+      } finally {
+        setCvUploading(false);
+      }
     }
   };
 
@@ -131,12 +200,14 @@ const Profile = () => {
     setProfileSuccess('');
   };
   
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setProfilePhoto(file);
-      
-      // Create a preview URL
+      setProfileError('');
+      setProfileSuccess('');
+
+      // Preview
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target && event.target.result) {
@@ -144,9 +215,21 @@ const Profile = () => {
         }
       };
       reader.readAsDataURL(file);
-      
-      setProfileError('');
-      setProfileSuccess('');
+
+      // Immediate upload as avatar
+      try {
+        if (user?.id) {
+          const res = await userAPI.uploadAvatar(user.id, file);
+          if (res.data?.success && res.data?.data?.avatar) {
+            // reflect avatar in UI
+            setProfileData((prev) => ({ ...prev, avatar: res.data.data.avatar }));
+            updateUser({ ...user, avatar: res.data.data.avatar });
+            setProfileSuccess('Photo uploaded successfully');
+          }
+        }
+      } catch (err: any) {
+        setProfileError(err.response?.data?.message || 'Failed to upload photo');
+      }
     }
   };
 
@@ -178,6 +261,23 @@ const Profile = () => {
       // Add profile photo if selected
       if (profilePhoto) {
         formData.append('profilePhoto', profilePhoto);
+      }
+      // Add emergency contact
+      formData.append('emergencyContact.name', emergencyContact.name);
+      formData.append('emergencyContact.phone', emergencyContact.phone);
+      formData.append('emergencyContact.relationship', emergencyContact.relationship);
+      // Add skills (comma-separated -> array)
+      const skillsArr = skillsText
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      skillsArr.forEach((s) => formData.append('skills', s));
+      // Normalize number/date
+      if (profileData.salary) {
+        formData.set('salary', String(Number(profileData.salary)));
+      }
+      if (profileData.hireDate) {
+        formData.set('hireDate', profileData.hireDate);
       }
       
       const response = await userAPI.updateProfileWithPhoto(formData);
@@ -256,24 +356,52 @@ const Profile = () => {
 
   const countryChoose = [
     { value: "Select", label: "Select" },
-    { value: "USA", label: "USA" },
-    { value: "Canada", label: "Canada" },
-    { value: "Germany", label: "Germany" },
-    { value: "France", label: "France" },
+    { value: "Tunisia", label: "Tunisia" },
   ];
   const stateChoose = [
     { value: "Select", label: "Select" },
-    { value: "california", label: "california" },
-    { value: "Texas", label: "Texas" },
-    { value: "New York", label: "New York" },
-    { value: "Florida", label: "Florida" },
+    { value: "Tunis", label: "Tunis" },
+    { value: "Ariana", label: "Ariana" },
+    { value: "Ben Arous", label: "Ben Arous" },
+    { value: "Manouba", label: "Manouba" },
+    { value: "Nabeul", label: "Nabeul" },
+    { value: "Zaghouan", label: "Zaghouan" },
+    { value: "Bizerte", label: "Bizerte" },
+    { value: "Béja", label: "Béja" },
+    { value: "Jendouba", label: "Jendouba" },
+    { value: "Le Kef", label: "Le Kef" },
+    { value: "Siliana", label: "Siliana" },
+    { value: "Sousse", label: "Sousse" },
+    { value: "Monastir", label: "Monastir" },
+    { value: "Mahdia", label: "Mahdia" },
+    { value: "Sfax", label: "Sfax" },
+    { value: "Kairouan", label: "Kairouan" },
+    { value: "Kasserine", label: "Kasserine" },
+    { value: "Sidi Bouzid", label: "Sidi Bouzid" },
+    { value: "Gabès", label: "Gabès" },
+    { value: "Médenine", label: "Médenine" },
+    { value: "Tataouine", label: "Tataouine" },
+    { value: "Gafsa", label: "Gafsa" },
+    { value: "Tozeur", label: "Tozeur" },
+    { value: "Kébili", label: "Kébili" },
   ];
   const cityChoose = [
     { value: "Select", label: "Select" },
-    { value: "Los Angeles", label: "Los Angeles" },
-    { value: "San Francisco", label: "San Francisco" },
-    { value: "San Diego", label: "San Diego" },
-    { value: "Fresno", label: "Fresno" },
+    { value: "Tunis", label: "Tunis" },
+    { value: "Sfax", label: "Sfax" },
+    { value: "Sousse", label: "Sousse" },
+    { value: "Kairouan", label: "Kairouan" },
+    { value: "Bizerte", label: "Bizerte" },
+    { value: "Gabès", label: "Gabès" },
+    { value: "Gafsa", label: "Gafsa" },
+    { value: "Monastir", label: "Monastir" },
+    { value: "Nabeul", label: "Nabeul" },
+    { value: "Mahdia", label: "Mahdia" },
+    { value: "Kasserine", label: "Kasserine" },
+    { value: "Kébili", label: "Kébili" },
+    { value: "Tozeur", label: "Tozeur" },
+    { value: "Médenine", label: "Médenine" },
+    { value: "Tataouine", label: "Tataouine" },
   ];
 
   if (loading) {
@@ -295,6 +423,36 @@ const Profile = () => {
       {/* Page Wrapper */}
       <div className="page-wrapper">
         <div className="content">
+          {user?.role === 'STARTUP' ? (
+            <>
+              {/* Breadcrumb */}
+              <div className="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
+                <div className="my-auto mb-2">
+                  <h2 className="mb-1">Profil STARTUP</h2>
+                  <nav>
+                    <ol className="breadcrumb mb-0">
+                      <li className="breadcrumb-item">
+                        <Link to={route.adminDashboard}>
+                          <i className="ti ti-smart-home" />
+                        </Link>
+                      </li>
+                      <li className="breadcrumb-item">Pages</li>
+                      <li className="breadcrumb-item active" aria-current="page">
+                        Profil STARTUP
+                      </li>
+                    </ol>
+                  </nav>
+                </div>
+                <div className="head-icons ms-2">
+                  <CollapseHeader />
+                </div>
+              </div>
+              {/* /Breadcrumb */}
+
+              <StartupProfileForm />
+            </>
+          ) : (
+            <>
           {/* Breadcrumb */}
           <div className="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
             <div className="my-auto mb-2">
@@ -352,9 +510,15 @@ const Profile = () => {
                                 alt="Profile Preview" 
                                 className="rounded-circle w-100 h-100 object-fit-cover" 
                               />
+                            ) : profileData.avatar ? (
+                              <img 
+                                src={profileData.avatar?.startsWith('http') ? profileData.avatar : `${API_BASE_URL}${profileData.avatar}`} 
+                                alt="Avatar" 
+                                className="rounded-circle w-100 h-100 object-fit-cover" 
+                              />
                             ) : user?.profilePhoto ? (
                               <img 
-                                src={user.profilePhoto} 
+                                src={user.profilePhoto?.startsWith('http') ? user.profilePhoto : `${API_BASE_URL}${user.profilePhoto}`} 
                                 alt="Current Profile" 
                                 className="rounded-circle w-100 h-100 object-fit-cover" 
                               />
@@ -565,6 +729,201 @@ const Profile = () => {
                     </div>
                   </div>
                 </div>
+                <div className="border-bottom mb-3">
+                  <h6 className="mb-3">Job Details</h6>
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="row align-items-center mb-3">
+                        <div className="col-md-4">
+                          <label className="form-label mb-md-0">Department</label>
+                        </div>
+                        <div className="col-md-8">
+                          <input
+                            type="text"
+                            name="department"
+                            value={profileData.department}
+                            onChange={handleProfileInputChange}
+                            className="form-control"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="row align-items-center mb-3">
+                        <div className="col-md-4">
+                          <label className="form-label mb-md-0">Position</label>
+                        </div>
+                        <div className="col-md-8">
+                          <input
+                            type="text"
+                            name="position"
+                            value={profileData.position}
+                            onChange={handleProfileInputChange}
+                            className="form-control"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="row align-items-center mb-3">
+                        <div className="col-md-4">
+                          <label className="form-label mb-md-0">Hire Date</label>
+                        </div>
+                        <div className="col-md-8">
+                          <input
+                            type="date"
+                            name="hireDate"
+                            value={profileData.hireDate}
+                            onChange={handleProfileInputChange}
+                            className="form-control"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="row align-items-center mb-3">
+                        <div className="col-md-4">
+                          <label className="form-label mb-md-0">Salary</label>
+                        </div>
+                        <div className="col-md-8">
+                          <input
+                            type="number"
+                            name="salary"
+                            value={profileData.salary}
+                            onChange={handleProfileInputChange}
+                            className="form-control"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="border-bottom mb-3">
+                  <h6 className="mb-3">CV</h6>
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="row align-items-center mb-3">
+                        <div className="col-md-4">
+                          <label className="form-label mb-md-0">Upload CV (PDF)</label>
+                        </div>
+                        <div className="col-md-8">
+                          <input
+                            type="file"
+                            accept="application/pdf"
+                            onChange={handleCvUpload}
+                            className="form-control"
+                            disabled={cvUploading}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      {profileData.cv ? (
+                        <div className="d-flex align-items-center">
+                          <a
+                            href={profileData.cv.startsWith('http') ? profileData.cv : `${API_BASE_URL}${profileData.cv}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-outline-primary me-2"
+                          >
+                            View CV
+                          </a>
+                          <span className="text-muted small">PDF</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted">No CV uploaded</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="border-bottom mb-3">
+                  <h6 className="mb-3">Emergency Contact</h6>
+                  <div className="row">
+                    <div className="col-md-4">
+                      <div className="row align-items-center mb-3">
+                        <div className="col-md-5">
+                          <label className="form-label mb-md-0">Name</label>
+                        </div>
+                        <div className="col-md-7">
+                          <input
+                            type="text"
+                            value={emergencyContact.name}
+                            onChange={(e) => setEmergencyContact({ ...emergencyContact, name: e.target.value })}
+                            className="form-control"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="row align-items-center mb-3">
+                        <div className="col-md-5">
+                          <label className="form-label mb-md-0">Phone</label>
+                        </div>
+                        <div className="col-md-7">
+                          <input
+                            type="text"
+                            value={emergencyContact.phone}
+                            onChange={(e) => setEmergencyContact({ ...emergencyContact, phone: e.target.value })}
+                            className="form-control"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="row align-items-center mb-3">
+                        <div className="col-md-5">
+                          <label className="form-label mb-md-0">Relationship</label>
+                        </div>
+                        <div className="col-md-7">
+                          <input
+                            type="text"
+                            value={emergencyContact.relationship}
+                            onChange={(e) => setEmergencyContact({ ...emergencyContact, relationship: e.target.value })}
+                            className="form-control"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="border-bottom mb-3">
+                  <h6 className="mb-3">Additional</h6>
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="row align-items-center mb-3">
+                        <div className="col-md-4">
+                          <label className="form-label mb-md-0">Avatar (URL)</label>
+                        </div>
+                        <div className="col-md-8">
+                          <input
+                            type="text"
+                            name="avatar"
+                            value={profileData.avatar}
+                            onChange={handleProfileInputChange}
+                            className="form-control"
+                            placeholder="https://..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="row align-items-center mb-3">
+                        <div className="col-md-4">
+                          <label className="form-label mb-md-0">Skills (comma-separated)</label>
+                        </div>
+                        <div className="col-md-8">
+                          <input
+                            type="text"
+                            value={skillsText}
+                            onChange={(e) => setSkillsText(e.target.value)}
+                            className="form-control"
+                            placeholder="e.g. React, Node.js, MongoDB"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div className="d-flex align-items-center justify-content-end">
                   <button
                     type="button"
@@ -700,6 +1059,8 @@ const Profile = () => {
               </form>
             </div>
           </div>
+            </>
+          )}
         </div>
         <div className="footer d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
           <p className="mb-0">2014 - 2025 © SynergyPark.</p>

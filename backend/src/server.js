@@ -20,6 +20,8 @@ const io = new Server(server, {
 // Initialize Socket Manager
 const socketManager = new SocketManager(io);
 
+// Expose socket manager for diagnostic endpoint
+io.socketManager = socketManager;
 // Function to find an available port
 const findAvailablePort = (startPort) => {
   return new Promise((resolve, reject) => {

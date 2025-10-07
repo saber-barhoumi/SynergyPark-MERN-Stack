@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // ✅ Base API URL - Make sure this matches your backend
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 // ✅ Create axios instance with proper configuration
 const apiClient = axios.create({
@@ -204,12 +204,72 @@ export const userAPI = {
     }
   },
 
+  uploadAvatar: async (userId, file) => {
+    try {
+      const token = localStorage.getItem('token');
+      const form = new FormData();
+      form.append('avatar', file);
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      };
+      const response = await apiClient.post(`/api/user/${userId}/avatar`, form, config);
+      return response;
+    } catch (error) {
+      console.error('Upload avatar API error:', error);
+      throw error;
+    }
+  },
+
+  uploadCv: async (userId, file) => {
+    try {
+      const token = localStorage.getItem('token');
+      const form = new FormData();
+      form.append('cv', file);
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      };
+      const response = await apiClient.post(`/api/user/${userId}/cv`, form, config);
+      return response;
+    } catch (error) {
+      console.error('Upload CV API error:', error);
+      throw error;
+    }
+  },
+
   changePassword: async (passwordData) => {
     try {
       const response = await apiClient.put('/api/user/change-password', passwordData);
       return response;
     } catch (error) {
       console.error('Change password API error:', error);
+      throw error;
+    }
+  }
+};
+
+// Events API
+export const eventsAPI = {
+  list: async () => {
+    try {
+      const response = await apiClient.get('/api/events');
+      return response;
+    } catch (error) {
+      console.error('List events API error:', error);
+      throw error;
+    }
+  },
+  create: async (event) => {
+    try {
+      const response = await apiClient.post('/api/events', event);
+      return response;
+    } catch (error) {
+      console.error('Create event API error:', error);
       throw error;
     }
   }
